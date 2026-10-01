@@ -1,0 +1,6 @@
+{
+  "name": "Aura Semijoias — Sistema de Vendas & Estoque",
+  "description": "Sistema simples e elegante de vendas, controle de estoque e emissão de recibos para loja de semijoias.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

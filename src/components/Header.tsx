@@ -1,0 +1,309 @@
+import React, { useState } from 'react';
+import { 
+  ShoppingBag, 
+  Package, 
+  ReceiptText, 
+  Wallet, 
+  BarChart3, 
+  Users, 
+  Database, 
+  LogOut,
+  MoreHorizontal,
+  X
+} from 'lucide-react';
+import { PWAInstallButton } from './PWAInstallButton';
+
+export type TabType = 'pdv' | 'produtos' | 'vendas' | 'caixa' | 'relatorios' | 'fiado' | 'config';
+
+interface HeaderProps {
+  activeTab: TabType;
+  setActiveTab: (tab: TabType) => void;
+  cartCount: number;
+  onLogout: () => void;
+  supabaseConnected: boolean;
+}
+
+export const Header: React.FC<HeaderProps> = ({
+  activeTab,
+  setActiveTab,
+  cartCount,
+  onLogout,
+  supabaseConnected
+}) => {
+  const [mobileMenuAberto, setMobileMenuAberto] = useState(false);
+
+  const handleSelectTab = (tab: TabType) => {
+    setActiveTab(tab);
+    setMobileMenuAberto(false);
+  };
+
+  return (
+    <header className="sticky top-0 z-30 bg-stone-900 border-b border-stone-800 text-stone-100 shadow-md">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+        {/* Zone 1: Brand Wordmark (Single text element in display face) */}
+        <button
+          onClick={() => setActiveTab('pdv')}
+          className="text-left group cursor-pointer focus:outline-none"
+        >
+          <span className="font-serif text-xl sm:text-2xl font-bold tracking-wider text-amber-200 group-hover:text-amber-100 transition">
+            LIMA SEMIJOIAS
+          </span>
+        </button>
+
+        {/* Zone 2: Navigation Links (Desktop) */}
+        <nav className="hidden xl:flex items-center gap-1">
+          <button
+            onClick={() => setActiveTab('pdv')}
+            className={`px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+              activeTab === 'pdv'
+                ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/60'
+            }`}
+          >
+            <ShoppingBag className="w-4 h-4 text-amber-400" />
+            <span>Nova Venda</span>
+            {cartCount > 0 && (
+              <span className="ml-1 px-1.5 py-0.2 bg-amber-500 text-stone-950 font-bold rounded-full text-[11px]">
+                {cartCount}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => setActiveTab('produtos')}
+            className={`px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+              activeTab === 'produtos'
+                ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/60'
+            }`}
+          >
+            <Package className="w-4 h-4" />
+            <span>Estoque</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('caixa')}
+            className={`px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+              activeTab === 'caixa'
+                ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/60'
+            }`}
+          >
+            <Wallet className="w-4 h-4 text-emerald-400" />
+            <span>Caixa & Lucro</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('fiado')}
+            className={`px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+              activeTab === 'fiado'
+                ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/60'
+            }`}
+          >
+            <Users className="w-4 h-4 text-amber-400" />
+            <span>Fiados</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('relatorios')}
+            className={`px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+              activeTab === 'relatorios'
+                ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/60'
+            }`}
+          >
+            <BarChart3 className="w-4 h-4 text-sky-400" />
+            <span>Relatórios</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('vendas')}
+            className={`px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+              activeTab === 'vendas'
+                ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/60'
+            }`}
+          >
+            <ReceiptText className="w-4 h-4" />
+            <span>Histórico</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('config')}
+            className={`px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+              activeTab === 'config'
+                ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/60'
+            }`}
+          >
+            <Database className="w-4 h-4" />
+            <span>Supabase</span>
+          </button>
+        </nav>
+
+        {/* Zone 3: Primary Actions (Supabase status pill + PWA Install + Logout/Lock) */}
+        <div className="flex items-center gap-2">
+          {/* Supabase connection indicator */}
+          <button
+            onClick={() => setActiveTab('config')}
+            title={supabaseConnected ? 'Conectado ao Supabase (Online)' : 'Modo Local / Desconectado (Clique para configurar Supabase)'}
+            className={`hidden sm:inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border transition cursor-pointer ${
+              supabaseConnected
+                ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-300 hover:bg-emerald-900/60'
+                : 'bg-stone-800 border-stone-700 text-stone-400 hover:text-stone-200'
+            }`}
+          >
+            <span className={`w-2 h-2 rounded-full ${supabaseConnected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+            <span>{supabaseConnected ? 'Supabase' : 'Modo Local'}</span>
+          </button>
+
+          <PWAInstallButton />
+
+          <button
+            onClick={onLogout}
+            title="Bloquear sistema / Sair"
+            className="p-2 text-stone-400 hover:text-stone-200 hover:bg-stone-800 rounded-lg transition cursor-pointer"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Mobile Bottom Navigation Anchor - Spacious, touch-friendly, safe-area aware */}
+      <div className="xl:hidden fixed bottom-0 left-0 right-0 z-40 bg-stone-950/95 backdrop-blur-lg border-t border-stone-800/90 h-16 pb-safe flex items-center justify-around px-2 shadow-2xl">
+        <button
+          onClick={() => handleSelectTab('pdv')}
+          className={`flex-1 h-full flex flex-col items-center justify-center transition-all cursor-pointer select-none active:scale-95 ${
+            activeTab === 'pdv' ? 'text-amber-400 font-bold' : 'text-stone-400 hover:text-stone-300'
+          }`}
+        >
+          <div className="relative">
+            <ShoppingBag className={`w-5 h-5 transition-transform ${activeTab === 'pdv' ? 'scale-110 text-amber-400' : ''}`} />
+            {cartCount > 0 && (
+              <span className="absolute -top-1 -right-2 px-1.5 py-0.2 bg-amber-500 text-stone-950 font-black rounded-full text-[9px] shadow-xs">
+                {cartCount}
+              </span>
+            )}
+          </div>
+          <span className="mt-1 text-[11px] tracking-tight">Vender</span>
+          {activeTab === 'pdv' && (
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-0.5" />
+          )}
+        </button>
+
+        <button
+          onClick={() => handleSelectTab('produtos')}
+          className={`flex-1 h-full flex flex-col items-center justify-center transition-all cursor-pointer select-none active:scale-95 ${
+            activeTab === 'produtos' ? 'text-amber-400 font-bold' : 'text-stone-400 hover:text-stone-300'
+          }`}
+        >
+          <Package className={`w-5 h-5 transition-transform ${activeTab === 'produtos' ? 'scale-110 text-amber-400' : ''}`} />
+          <span className="mt-1 text-[11px] tracking-tight">Estoque</span>
+          {activeTab === 'produtos' && (
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-0.5" />
+          )}
+        </button>
+
+        <button
+          onClick={() => handleSelectTab('caixa')}
+          className={`flex-1 h-full flex flex-col items-center justify-center transition-all cursor-pointer select-none active:scale-95 ${
+            activeTab === 'caixa' ? 'text-amber-400 font-bold' : 'text-stone-400 hover:text-stone-300'
+          }`}
+        >
+          <Wallet className={`w-5 h-5 transition-transform ${activeTab === 'caixa' ? 'scale-110 text-amber-400' : ''}`} />
+          <span className="mt-1 text-[11px] tracking-tight">Caixa</span>
+          {activeTab === 'caixa' && (
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-0.5" />
+          )}
+        </button>
+
+        <button
+          onClick={() => handleSelectTab('fiado')}
+          className={`flex-1 h-full flex flex-col items-center justify-center transition-all cursor-pointer select-none active:scale-95 ${
+            activeTab === 'fiado' ? 'text-amber-400 font-bold' : 'text-stone-400 hover:text-stone-300'
+          }`}
+        >
+          <Users className={`w-5 h-5 transition-transform ${activeTab === 'fiado' ? 'scale-110 text-amber-400' : ''}`} />
+          <span className="mt-1 text-[11px] tracking-tight">Fiados</span>
+          {activeTab === 'fiado' && (
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-0.5" />
+          )}
+        </button>
+
+        <button
+          onClick={() => setMobileMenuAberto(true)}
+          className={`flex-1 h-full flex flex-col items-center justify-center transition-all cursor-pointer select-none active:scale-95 ${
+            ['vendas', 'relatorios', 'config'].includes(activeTab) ? 'text-amber-400 font-bold' : 'text-stone-400 hover:text-stone-300'
+          }`}
+        >
+          <MoreHorizontal className={`w-5 h-5 transition-transform ${['vendas', 'relatorios', 'config'].includes(activeTab) ? 'scale-110 text-amber-400' : ''}`} />
+          <span className="mt-1 text-[11px] tracking-tight">Mais</span>
+          {['vendas', 'relatorios', 'config'].includes(activeTab) && (
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-0.5" />
+          )}
+        </button>
+      </div>
+
+      {/* Mobile "Mais" Bottom Sheet Drawer */}
+      {mobileMenuAberto && (
+        <div className="xl:hidden fixed inset-0 z-50 flex flex-col justify-end bg-black/60 backdrop-blur-xs">
+          <div className="w-full bg-stone-900 rounded-t-3xl border-t border-stone-800 p-5 shadow-2xl space-y-3 animate-in slide-in-from-bottom duration-200">
+            <div className="flex items-center justify-between pb-2 border-b border-stone-800">
+              <span className="text-xs uppercase tracking-wider font-semibold text-stone-400">
+                Menu Adicional
+              </span>
+              <button
+                onClick={() => setMobileMenuAberto(false)}
+                className="w-8 h-8 rounded-full bg-stone-800 flex items-center justify-center text-stone-400 hover:text-stone-200"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <button
+                onClick={() => handleSelectTab('relatorios')}
+                className={`p-3 rounded-xl flex items-center gap-2.5 text-xs font-semibold border transition ${
+                  activeTab === 'relatorios'
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                    : 'bg-stone-800/80 text-stone-200 border-stone-700'
+                }`}
+              >
+                <BarChart3 className="w-4 h-4 text-sky-400" />
+                <span>Relatórios</span>
+              </button>
+
+              <button
+                onClick={() => handleSelectTab('vendas')}
+                className={`p-3 rounded-xl flex items-center gap-2.5 text-xs font-semibold border transition ${
+                  activeTab === 'vendas'
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                    : 'bg-stone-800/80 text-stone-200 border-stone-700'
+                }`}
+              >
+                <ReceiptText className="w-4 h-4 text-amber-400" />
+                <span>Histórico Vendas</span>
+              </button>
+
+              <button
+                onClick={() => handleSelectTab('config')}
+                className={`col-span-2 p-3 rounded-xl flex items-center justify-between text-xs font-semibold border transition ${
+                  activeTab === 'config'
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                    : 'bg-stone-800/80 text-stone-200 border-stone-700'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <Database className="w-4 h-4 text-emerald-400" />
+                  <span>Configurações & Supabase</span>
+                </div>
+                <span className={`w-2 h-2 rounded-full ${supabaseConnected ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </header>
+  );
+};
