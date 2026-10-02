@@ -435,6 +435,34 @@ export const ConfiguracoesSupabase: React.FC<ConfiguracoesSupabaseProps> = ({
     setTimeout(() => setMsgSenha(null), 3500);
   };
 
+  // Reset / Zerar Sistema para entrega ao cliente
+  const [modalZerarAberto, setModalZerarAberto] = useState(false);
+  const [zerandoSistema, setZerandoSistema] = useState(false);
+
+  const handleExecutarZerarSistema = async () => {
+    setZerandoSistema(true);
+    try {
+      await storage.zerarSistema();
+      onRefreshAll();
+      atualizarStatus();
+      setModalZerarAberto(false);
+      setAlertaBackup({
+        tipo: 'sucesso',
+        titulo: 'Sistema Zerado com Sucesso',
+        mensagem: 'Todos os produtos, vendas, movimentações de caixa e fiados foram completamente limpos. O sistema está 100% pronto para entrega à cliente.'
+      });
+      setTimeout(() => setAlertaBackup(null), 6000);
+    } catch (err: any) {
+      setAlertaBackup({
+        tipo: 'erro',
+        titulo: 'Erro ao Zerar Sistema',
+        mensagem: err?.message || 'Falha ao zerar dados.'
+      });
+    } finally {
+      setZerandoSistema(false);
+    }
+  };
+
   // Reset to default
   const handleRestaurarPadrao = () => {
     const confirmacao = window.confirm('Deseja realmente restaurar os produtos padrão do catálogo da Lima Semijoias? Isso adicionará as semijoias originais.');
@@ -1147,18 +1175,70 @@ export const ConfiguracoesSupabase: React.FC<ConfiguracoesSupabaseProps> = ({
             )}
           </div>
 
-          {/* Reset catalog option */}
-          <div className="text-center pt-2">
+          {/* Zerar Sistema para Entrega ao Cliente */}
+          <div className="bg-rose-50/70 border border-rose-200/80 rounded-2xl p-4 space-y-2.5">
+            <div className="flex items-center gap-2">
+              <Trash2 className="w-4 h-4 text-rose-600" />
+              <h3 className="text-xs font-bold text-rose-950 uppercase tracking-wider">
+                Limpeza Total para Entrega
+              </h3>
+            </div>
+            <p className="text-xs text-rose-800">
+              Deixa o sistema 100% zerado (produtos, vendas, movimentações de caixa e fiados limpos) pronto para entregar à cliente final.
+            </p>
             <button
-              onClick={handleRestaurarPadrao}
-              className="text-[11px] text-stone-400 hover:text-rose-600 inline-flex items-center gap-1.5 transition"
+              type="button"
+              onClick={() => setModalZerarAberto(true)}
+              className="w-full py-2.5 px-3 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-98 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-xs"
             >
-              <RefreshCw className="w-3 h-3" />
-              <span>Restaurar catálogo inicial da boutique</span>
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Zerar Sistema para Entrega ao Cliente</span>
             </button>
           </div>
         </div>
       </div>
+
+      {/* Modal de Confirmação para Zerar Sistema */}
+      {modalZerarAberto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-stone-200 space-y-4 animate-in fade-in zoom-in-95">
+            <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+
+            <div className="text-center space-y-1.5">
+              <h3 className="font-serif text-lg font-bold text-stone-900">
+                Zerar Todos os Dados do Sistema?
+              </h3>
+              <p className="text-xs text-stone-600 leading-relaxed">
+                Esta ação vai limpar <strong>todos os produtos cadastrados</strong>, <strong>histórico de vendas</strong>, <strong>movimentações do caixa</strong> e <strong>contas de fiado</strong>.
+              </p>
+              <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-amber-900 text-[11px] text-left mt-2">
+                ✓ Use esta opção para entregar o sistema zerado e limpo para sua cliente final cadastrar as joias reais dela e começar as vendas.
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5 pt-2">
+              <button
+                type="button"
+                disabled={zerandoSistema}
+                onClick={() => setModalZerarAberto(false)}
+                className="py-2.5 px-4 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-800 text-xs font-bold transition cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={zerandoSistema}
+                onClick={handleExecutarZerarSistema}
+                className="py-2.5 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-98 text-white text-xs font-bold transition cursor-pointer shadow-xs disabled:opacity-50"
+              >
+                {zerandoSistema ? 'Zerando...' : 'Sim, Zerar Tudo'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

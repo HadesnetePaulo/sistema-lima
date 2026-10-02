@@ -1,6 +1,82 @@
 <!doctype html>
 <html lang="pt-BR">
   <head>
+    <script>
+      // Suppress Vite HMR WebSocket connection errors as HMR is disabled in AI Studio iframe
+      (function() {
+        if (typeof window !== 'undefined') {
+          // Dummy WebSocket for vite-hmr to prevent failed connection errors in console
+          var OrigWebSocket = window.WebSocket;
+          if (OrigWebSocket) {
+            window.WebSocket = function(url, protocols) {
+              if (protocols === 'vite-hmr' || (typeof url === 'string' && (url.indexOf('vite') !== -1 || url.indexOf('hmr') !== -1))) {
+                return {
+                  addEventListener: function() {},
+                  removeEventListener: function() {},
+                  send: function() {},
+                  close: function() {},
+                  readyState: 3
+                };
+              }
+              return new OrigWebSocket(url, protocols);
+            };
+            window.WebSocket.prototype = OrigWebSocket.prototype;
+          }
+
+          var drop = function(args) {
+            if (!args || !args.length) return false;
+            for (var i = 0; i < args.length; i++) {
+              var item = String(args[i] || '');
+              if (
+                item.indexOf('[vite]') !== -1 ||
+                item.indexOf('vite:') !== -1 ||
+                item.indexOf('WebSocket') !== -1 ||
+                item.indexOf('websocket') !== -1 ||
+                item.indexOf('HMR') !== -1
+              ) {
+                return true;
+              }
+            }
+            return false;
+          };
+
+          ['error', 'warn', 'log', 'info', 'debug'].forEach(function(m) {
+            var orig = console[m];
+            console[m] = function() {
+              if (drop(arguments)) return;
+              return orig.apply(console, arguments);
+            };
+          });
+
+          window.addEventListener('error', function(event) {
+            var msg = event ? (event.message || (event.error && event.error.message) || '') : '';
+            if (msg.indexOf('WebSocket') !== -1 || msg.indexOf('[vite]') !== -1 || msg.indexOf('vite') !== -1) {
+              event.stopImmediatePropagation();
+              event.preventDefault();
+              return true;
+            }
+          }, true);
+
+          window.addEventListener('unhandledrejection', function(event) {
+            var reason = event ? String(event.reason || (event.reason && event.reason.message) || '') : '';
+            if (reason.indexOf('WebSocket') !== -1 || reason.indexOf('[vite]') !== -1 || reason.indexOf('vite') !== -1) {
+              event.stopImmediatePropagation();
+              event.preventDefault();
+              return true;
+            }
+          }, true);
+        }
+      })();
+
+      // Garante desinstalação de qualquer Service Worker antigo em modo preview para evitar tela branca
+      if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(regs) {
+          for (var i = 0; i < regs.length; i++) {
+            regs[i].unregister();
+          }
+        }).catch(function() {});
+      }
+    </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Lima Semijoias — Sistema de Vendas & Estoque</title>
@@ -25,51 +101,6 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-
-    <script>
-      // Suppress Vite HMR WebSocket connection errors as HMR is disabled in AI Studio iframe
-      (function() {
-        var origError = console.error;
-        console.error = function() {
-          var msg = arguments && arguments[0];
-          if (typeof msg === 'string' && (msg.indexOf('[vite]') !== -1 || msg.indexOf('WebSocket') !== -1 || msg.indexOf('websocket') !== -1)) {
-            return;
-          }
-          return origError.apply(console, arguments);
-        };
-        var origWarn = console.warn;
-        console.warn = function() {
-          var msg = arguments && arguments[0];
-          if (typeof msg === 'string' && (msg.indexOf('[vite]') !== -1 || msg.indexOf('WebSocket') !== -1 || msg.indexOf('websocket') !== -1)) {
-            return;
-          }
-          return origWarn.apply(console, arguments);
-        };
-      })();
-
-      // Garante desinstalação de qualquer Service Worker antigo em modo preview para evitar tela branca
-      if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(function(regs) {
-          for (var i = 0; i < regs.length; i++) {
-            regs[i].unregister();
-          }
-        }).catch(function() {});
-      }
-
-      // Ignore WebSocket and [vite] HMR errors in AI Studio iframe
-      window.addEventListener('error', function(event) {
-        if (event && event.message && (event.message.indexOf('WebSocket') !== -1 || event.message.indexOf('[vite]') !== -1)) {
-          event.stopImmediatePropagation();
-          event.preventDefault();
-        }
-      }, true);
-      window.addEventListener('unhandledrejection', function(event) {
-        if (event && event.reason && (String(event.reason).indexOf('WebSocket') !== -1 || String(event.reason).indexOf('[vite]') !== -1)) {
-          event.stopImmediatePropagation();
-          event.preventDefault();
-        }
-      }, true);
-    </script>
   </head>
   <body class="bg-[#FAF8F5] text-stone-800 antialiased selection:bg-amber-200 selection:text-amber-950 min-h-screen">
     <div id="root"></div>

@@ -176,18 +176,18 @@ export const storage = {
     try {
       const firestoreData = await fetchStateFromFirestore();
       if (firestoreData) {
-        // Smart Merge: Nunca apaga dados que o cliente cadastrou no dispositivo dele!
-        const produtosUnificados = mergeArraysById(localProdutos, firestoreData.produtos || []);
-        const vendasUnificadas = mergeArraysById(localVendas, firestoreData.vendas || []);
-        const caixaUnificado = mergeArraysById(localCaixa, firestoreData.caixa || []);
-        const fiadosUnificados = mergeArraysById(localFiados, firestoreData.fiados || []);
+        // Nuvem Firebase Firestore é a fonte única centralizada da loja
+        const produtosUnificados = firestoreData.produtos || [];
+        const vendasUnificadas = firestoreData.vendas || [];
+        const caixaUnificado = firestoreData.caixa || [];
+        const fiadosUnificados = firestoreData.fiados || [];
 
         safeLocalStorage.setItem(STORAGE_KEY_PRODUTOS, JSON.stringify(produtosUnificados));
         safeLocalStorage.setItem(STORAGE_KEY_VENDAS, JSON.stringify(vendasUnificadas));
         safeLocalStorage.setItem(STORAGE_KEY_CAIXA, JSON.stringify(caixaUnificado));
         safeLocalStorage.setItem(STORAGE_KEY_FIADOS, JSON.stringify(fiadosUnificados));
 
-        // Replica a união para o servidor Express local e Firestore
+        // Replica a união para o servidor Express local
         callServerApi('/api/sync', {
           method: 'POST',
           body: JSON.stringify({
@@ -197,13 +197,6 @@ export const storage = {
             fiados: fiadosUnificados,
             masterPassword: this.getMasterPassword()
           })
-        }).catch(() => {});
-
-        saveStateToFirestore({
-          produtos: produtosUnificados,
-          vendas: vendasUnificadas,
-          caixa: caixaUnificado,
-          fiados: fiadosUnificados
         }).catch(() => {});
 
         return {
@@ -310,9 +303,8 @@ export const storage = {
     try {
       const data = safeLocalStorage.getItem(STORAGE_KEY_PRODUTOS);
       if (data === null) {
-        // Initial setup only if key was never created
-        safeLocalStorage.setItem(STORAGE_KEY_PRODUTOS, JSON.stringify(PRODUTOS_INICIAIS));
-        return PRODUTOS_INICIAIS;
+        safeLocalStorage.setItem(STORAGE_KEY_PRODUTOS, JSON.stringify([]));
+        return [];
       }
       const parsed = JSON.parse(data);
       if (!Array.isArray(parsed)) {
@@ -327,8 +319,40 @@ export const storage = {
     }
   },
 
+  /**
+   * Zera completamente o sistema para entrega ao cliente:
+   * Limpa produtos, vendas, movimentações de caixa e controle de fiado
+   * tanto no dispositivo local quanto no servidor e na nuvem Firebase Firestore.
+   */
+  async zerarSistema(): Promise<void> {
+    safeLocalStorage.setItem(STORAGE_KEY_PRODUTOS, JSON.stringify([]));
+    safeLocalStorage.setItem(STORAGE_KEY_VENDAS, JSON.stringify([]));
+    safeLocalStorage.setItem(STORAGE_KEY_CAIXA, JSON.stringify([]));
+    safeLocalStorage.setItem(STORAGE_KEY_FIADOS, JSON.stringify([]));
+
+    // Salva estado zerado no Firebase Firestore
+    await saveStateToFirestore({
+      produtos: [],
+      vendas: [],
+      caixa: [],
+      fiados: []
+    });
+
+    // Salva estado zerado no servidor Express
+    await callServerApi('/api/sync', {
+      method: 'POST',
+      body: JSON.stringify({
+        produtos: [],
+        vendas: [],
+        caixa: [],
+        fiados: [],
+        masterPassword: this.getMasterPassword()
+      })
+    }).catch(() => {});
+  },
+
   resetToDefaults(): void {
-    safeLocalStorage.setItem(STORAGE_KEY_PRODUTOS, JSON.stringify(PRODUTOS_INICIAIS));
+    safeLocalStorage.setItem(STORAGE_KEY_PRODUTOS, JSON.stringify([]));
   },
 
   saveProdutos(produtos: Produto[]): void {

@@ -226,6 +226,20 @@ app.post('/api/sync', (req, res) => {
   }
 });
 
+// POST /api/reset - Complete system reset to zero
+app.post('/api/reset', (req, res) => {
+  currentStore = {
+    produtos: [],
+    vendas: [],
+    caixa: [],
+    fiados: [],
+    masterPassword: currentStore.masterPassword || '123456',
+    lastUpdated: new Date().toISOString()
+  };
+  saveDatabase(currentStore);
+  res.json({ success: true, ...currentStore });
+});
+
 // Auth & Master Password endpoint
 app.get('/api/auth/password', (req, res) => {
   currentStore = loadDatabase();
@@ -458,9 +472,11 @@ async function startServer() {
   if (!isProduction) {
     // In development, attach Vite middlewares with HMR disabled (as required in iframe environment)
     const vite = await createViteServer({
+      configFile: path.resolve(__dirname, 'vite.config.ts'),
       server: {
         middlewareMode: true,
         hmr: false,
+        ws: false,
       },
       appType: 'spa',
     });
@@ -476,6 +492,11 @@ async function startServer() {
         const indexPath = path.resolve(__dirname, 'index.html');
         let template = fs.readFileSync(indexPath, 'utf-8');
         template = await vite.transformIndexHtml(url, template);
+        // Ensure inline suppression script is placed before any @vite/client injection
+        if (template.includes('/@vite/client') && template.includes('// Suppress Vite HMR WebSocket connection errors')) {
+          template = template.replace(/<script type="module" src="\/@vite\/client"><\/script>\s*/i, '');
+          template = template.replace('</script>\n    <meta charset="UTF-8" />', '</script>\n    <script type="module" src="/@vite/client"></script>\n    <meta charset="UTF-8" />');
+        }
         res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
       } catch (e: any) {
         vite.ssrFixStacktrace(e);
