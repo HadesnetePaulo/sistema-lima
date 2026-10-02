@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Produto, CATEGORIAS, CategoriaProduto } from '../types';
 import { storage } from '../lib/storage';
+import { buscarEspecificacoesPorCodigo } from '../lib/barcodeLookup';
 import { 
   Package, 
   Plus, 
@@ -13,7 +14,10 @@ import {
   Sparkles,
   Barcode,
   RotateCcw,
-  Camera
+  Camera,
+  Loader2,
+  Wand2,
+  Zap
 } from 'lucide-react';
 import { CameraBarcodeScanner } from './CameraBarcodeScanner';
 
@@ -41,6 +45,12 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
   const [formEstoque, setFormEstoque] = useState('');
   const [formImagem, setFormImagem] = useState('');
   const [formErro, setFormErro] = useState<string | null>(null);
+  const [carregandoSpecs, setCarregandoSpecs] = useState(false);
+  const [specsInfo, setSpecsInfo] = useState<{
+    texto: string;
+    detalhes?: string;
+    fonte?: string;
+  } | null>(null);
 
   // Confirm delete
   const [deletandoId, setDeletandoId] = useState<string | null>(null);
@@ -85,6 +95,7 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
     setFormEstoque('5');
     setFormImagem('');
     setFormErro(null);
+    setSpecsInfo(null);
     setModalAberto(true);
   };
 
@@ -99,7 +110,53 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
     setFormEstoque(prod.quantidade_estoque.toString());
     setFormImagem(prod.imagem_url || '');
     setFormErro(null);
+    setSpecsInfo(null);
     setModalAberto(true);
+  };
+
+  // Busca e puxa as especificações completas a partir do código de barras
+  const handleBuscarEspecificacoes = async (codigoOpcional?: string) => {
+    const cod = (codigoOpcional !== undefined ? codigoOpcional : formCodigo).trim();
+    if (!cod) {
+      setFormErro('Por favor, informe ou escaneie um código de barras para puxar as especificações.');
+      return;
+    }
+
+    setCarregandoSpecs(true);
+    setFormErro(null);
+
+    try {
+      const specs = await buscarEspecificacoesPorCodigo(cod);
+      if (specs && specs.found) {
+        setFormNome(specs.nome);
+        setFormCategoria(specs.categoria);
+        setFormPreco(specs.preco_sugerido.toFixed(2));
+        if (specs.preco_custo_estimado) {
+          setFormPrecoCusto(specs.preco_custo_estimado.toFixed(2));
+        }
+        if (specs.imagem_url) {
+          setFormImagem(specs.imagem_url);
+        }
+        if (!formEstoque || formEstoque === '0') {
+          setFormEstoque(specs.estoque_sugerido.toString());
+        }
+
+        let fonteNome = 'Catálogo Lima Semijoias';
+        if (specs.source === 'catalogo_existente') fonteNome = 'Item Existente no Estoque';
+        if (specs.source === 'api_externa') fonteNome = 'Base Nacional de Produtos (EAN/GTIN)';
+        if (specs.source === 'inteligencia_referencia') fonteNome = 'Inteligência de Joalheria';
+
+        setSpecsInfo({
+          texto: `Especificações de "${specs.nome}" preenchidas com sucesso!`,
+          detalhes: specs.especificacoes_tecnicas,
+          fonte: fonteNome
+        });
+      }
+    } catch (err: any) {
+      setFormErro(err?.message || 'Não foi possível encontrar especificações para este código.');
+    } finally {
+      setCarregandoSpecs(false);
+    }
   };
 
   // Quick adjust stock +1 or -1 (Supabase + Local)
@@ -284,6 +341,9 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
                           alt={prod.nome}
                           referrerPolicy="no-referrer"
                           className="w-full h-full object-cover"
+                          onError={e => {
+                            (e.target as HTMLImageElement).src = '/logo-lima.jpg';
+                          }}
                         />
                       ) : (
                         <Sparkles className="w-6 h-6 text-amber-500" />
@@ -422,6 +482,9 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
                                 alt={prod.nome}
                                 referrerPolicy="no-referrer"
                                 className="w-full h-full object-cover"
+                                onError={e => {
+                                  (e.target as HTMLImageElement).src = '/logo-lima.jpg';
+                                }}
                               />
                             ) : (
                               <Sparkles className="w-4 h-4 text-amber-500" />
@@ -575,6 +638,28 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
                 </div>
               )}
 
+              {/* Specs Auto-Filled Banner */}
+              {specsInfo && (
+                <div className="p-3.5 bg-emerald-50/90 border border-emerald-200 rounded-xl text-xs text-emerald-900 space-y-1 animate-in fade-in">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold flex items-center gap-1.5 text-emerald-800">
+                      <Check className="w-4 h-4 text-emerald-600" />
+                      {specsInfo.texto}
+                    </span>
+                    {specsInfo.fonte && (
+                      <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-medium">
+                        {specsInfo.fonte}
+                      </span>
+                    )}
+                  </div>
+                  {specsInfo.detalhes && (
+                    <p className="text-[11px] text-emerald-700 leading-relaxed pl-5">
+                      {specsInfo.detalhes}
+                    </p>
+                  )}
+                </div>
+              )}
+
               {/* Nome */}
               <div>
                 <label className="block text-xs font-semibold text-stone-700 mb-1">
@@ -620,16 +705,46 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
                       className="text-[11px] text-amber-700 hover:text-amber-900 font-semibold inline-flex items-center gap-1 cursor-pointer bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded-lg border border-amber-200"
                     >
                       <Camera className="w-3 h-3 text-amber-600" />
-                      <span>Ler da Câmera</span>
+                      <span>Câmera</span>
                     </button>
                   </div>
-                  <input
-                    type="text"
-                    value={formCodigo}
-                    onChange={e => setFormCodigo(e.target.value)}
-                    placeholder="Ex: 7891001001"
-                    className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-amber-500 focus:bg-white font-mono"
-                  />
+                  <div className="relative flex items-center">
+                    <input
+                      type="text"
+                      value={formCodigo}
+                      onChange={e => setFormCodigo(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleBuscarEspecificacoes();
+                        }
+                      }}
+                      placeholder="Ex: 7891001001"
+                      className="w-full pl-3.5 pr-28 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-amber-500 focus:bg-white font-mono"
+                    />
+                    <button
+                      type="button"
+                      disabled={carregandoSpecs || !formCodigo.trim()}
+                      onClick={() => handleBuscarEspecificacoes()}
+                      className="absolute right-1 px-2.5 py-1.5 bg-amber-500 hover:bg-amber-400 disabled:bg-stone-200 disabled:text-stone-400 text-stone-950 font-bold text-[11px] rounded-lg transition flex items-center gap-1 shadow-xs cursor-pointer disabled:cursor-not-allowed"
+                      title="Puxar especificações automaticamente pelo código"
+                    >
+                      {carregandoSpecs ? (
+                        <>
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          <span>Puxando...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="w-3 h-3 text-stone-950 fill-stone-950" />
+                          <span>Puxar Specs</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-stone-400 mt-1">
+                    Digite ou escaneie o código para puxar fotos, preços e especificações automaticamente.
+                  </p>
                 </div>
               </div>
 
@@ -722,6 +837,7 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
           onScan={code => {
             setFormCodigo(code);
             setCameraCadastroAberta(false);
+            handleBuscarEspecificacoes(code);
           }}
           onClose={() => setCameraCadastroAberta(false)}
         />

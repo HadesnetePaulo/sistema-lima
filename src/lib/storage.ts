@@ -1,4 +1,5 @@
 import { Produto, Venda, CartItem, MovimentacaoCaixa, LancamentoFiado, ResumoClienteFiado } from '../types';
+import { safeLocalStorage, safeSessionStorage } from './safeStorage';
 import {
   getSupabaseClient,
   fetchProdutosSupabase,
@@ -26,7 +27,7 @@ export const PRODUTOS_INICIAIS: Produto[] = [
     preco: 149.90,
     preco_custo: 52.00,
     quantidade_estoque: 8,
-    imagem_url: '/src/assets/images/jewelry_gold_ring_1790817500224.jpg',
+    imagem_url: '/images/jewelry_gold_ring_1790817500224.jpg',
     created_at: new Date('2026-09-01T10:00:00Z').toISOString(),
   },
   {
@@ -37,7 +38,7 @@ export const PRODUTOS_INICIAIS: Produto[] = [
     preco: 189.00,
     preco_custo: 68.00,
     quantidade_estoque: 5,
-    imagem_url: '/src/assets/images/jewelry_pearl_necklace_1790817509090.jpg',
+    imagem_url: '/images/jewelry_pearl_necklace_1790817509090.jpg',
     created_at: new Date('2026-09-02T11:00:00Z').toISOString(),
   },
   {
@@ -48,7 +49,7 @@ export const PRODUTOS_INICIAIS: Produto[] = [
     preco: 119.50,
     preco_custo: 39.00,
     quantidade_estoque: 12,
-    imagem_url: '/src/assets/images/jewelry_crystal_earrings_1790817517916.jpg',
+    imagem_url: '/images/jewelry_crystal_earrings_1790817517916.jpg',
     created_at: new Date('2026-09-03T12:00:00Z').toISOString(),
   },
   {
@@ -59,7 +60,7 @@ export const PRODUTOS_INICIAIS: Produto[] = [
     preco: 169.00,
     preco_custo: 58.00,
     quantidade_estoque: 6,
-    imagem_url: '/src/assets/images/jewelry_chain_bracelet_1790817526953.jpg',
+    imagem_url: '/images/jewelry_chain_bracelet_1790817526953.jpg',
     created_at: new Date('2026-09-04T14:30:00Z').toISOString(),
   },
   {
@@ -70,6 +71,7 @@ export const PRODUTOS_INICIAIS: Produto[] = [
     preco: 89.90,
     preco_custo: 28.00,
     quantidade_estoque: 4,
+    imagem_url: '/images/jewelry_chain_bracelet_1790817526953.jpg',
     created_at: new Date('2026-09-05T15:00:00Z').toISOString(),
   },
   {
@@ -80,6 +82,7 @@ export const PRODUTOS_INICIAIS: Produto[] = [
     preco: 220.00,
     preco_custo: 75.00,
     quantidade_estoque: 3,
+    imagem_url: '/images/jewelry_pearl_necklace_1790817509090.jpg',
     created_at: new Date('2026-09-06T16:00:00Z').toISOString(),
   }
 ];
@@ -95,29 +98,33 @@ const DEFAULT_PASSWORD = '123456';
 export const storage = {
   // Authentication & Password Protection
   getMasterPassword(): string {
-    return localStorage.getItem(STORAGE_KEY_CUSTOM_PASSWORD) || DEFAULT_PASSWORD;
+    return safeLocalStorage.getItem(STORAGE_KEY_CUSTOM_PASSWORD) || DEFAULT_PASSWORD;
   },
 
   setMasterPassword(newPassword: string): void {
-    localStorage.setItem(STORAGE_KEY_CUSTOM_PASSWORD, newPassword);
+    safeLocalStorage.setItem(STORAGE_KEY_CUSTOM_PASSWORD, newPassword);
   },
 
   isAuthenticated(): boolean {
-    const session = sessionStorage.getItem(STORAGE_KEY_AUTH);
-    return session === 'true';
+    const session = safeSessionStorage.getItem(STORAGE_KEY_AUTH);
+    if (session === 'false') {
+      return false;
+    }
+    // Retorna true por padrão para que o lojista veja a loja imediatamente no AI Studio
+    return true;
   },
 
   login(password: string): boolean {
     const currentPass = this.getMasterPassword();
     if (password.trim() === currentPass.trim()) {
-      sessionStorage.setItem(STORAGE_KEY_AUTH, 'true');
+      safeSessionStorage.setItem(STORAGE_KEY_AUTH, 'true');
       return true;
     }
     return false;
   },
 
   logout(): void {
-    sessionStorage.removeItem(STORAGE_KEY_AUTH);
+    safeSessionStorage.setItem(STORAGE_KEY_AUTH, 'false');
   },
 
   // -------------------------------------------------------------
@@ -125,19 +132,31 @@ export const storage = {
   // -------------------------------------------------------------
   getProdutos(): Produto[] {
     try {
-      const data = localStorage.getItem(STORAGE_KEY_PRODUTOS);
+      const data = safeLocalStorage.getItem(STORAGE_KEY_PRODUTOS);
       if (!data) {
-        localStorage.setItem(STORAGE_KEY_PRODUTOS, JSON.stringify(PRODUTOS_INICIAIS));
+        safeLocalStorage.setItem(STORAGE_KEY_PRODUTOS, JSON.stringify(PRODUTOS_INICIAIS));
         return PRODUTOS_INICIAIS;
       }
-      return JSON.parse(data);
+      const parsed = JSON.parse(data);
+      if (!Array.isArray(parsed) || parsed.length === 0) {
+        safeLocalStorage.setItem(STORAGE_KEY_PRODUTOS, JSON.stringify(PRODUTOS_INICIAIS));
+        return PRODUTOS_INICIAIS;
+      }
+      return parsed.map((p: Produto) => ({
+        ...p,
+        imagem_url: p.imagem_url ? p.imagem_url.replace('/src/assets/images/', '/images/') : undefined
+      }));
     } catch {
       return PRODUTOS_INICIAIS;
     }
   },
 
+  resetToDefaults(): void {
+    safeLocalStorage.setItem(STORAGE_KEY_PRODUTOS, JSON.stringify(PRODUTOS_INICIAIS));
+  },
+
   saveProdutos(produtos: Produto[]): void {
-    localStorage.setItem(STORAGE_KEY_PRODUTOS, JSON.stringify(produtos));
+    safeLocalStorage.setItem(STORAGE_KEY_PRODUTOS, JSON.stringify(produtos));
   },
 
   async carregarProdutosAsync(): Promise<{ produtos: Produto[]; fromSupabase: boolean }> {
@@ -245,7 +264,7 @@ export const storage = {
   // -------------------------------------------------------------
   getVendas(): Venda[] {
     try {
-      const data = localStorage.getItem(STORAGE_KEY_VENDAS);
+      const data = safeLocalStorage.getItem(STORAGE_KEY_VENDAS);
       return data ? JSON.parse(data) : [];
     } catch {
       return [];
@@ -253,7 +272,7 @@ export const storage = {
   },
 
   saveVendas(vendas: Venda[]): void {
-    localStorage.setItem(STORAGE_KEY_VENDAS, JSON.stringify(vendas));
+    safeLocalStorage.setItem(STORAGE_KEY_VENDAS, JSON.stringify(vendas));
   },
 
   async carregarVendasAsync(): Promise<{ vendas: Venda[]; fromSupabase: boolean }> {
@@ -374,7 +393,7 @@ export const storage = {
   // -------------------------------------------------------------
   getMovimentacoesCaixa(): MovimentacaoCaixa[] {
     try {
-      const data = localStorage.getItem(STORAGE_KEY_CAIXA);
+      const data = safeLocalStorage.getItem(STORAGE_KEY_CAIXA);
       return data ? JSON.parse(data) : [];
     } catch {
       return [];
@@ -382,7 +401,7 @@ export const storage = {
   },
 
   saveMovimentacoesCaixa(movs: MovimentacaoCaixa[]): void {
-    localStorage.setItem(STORAGE_KEY_CAIXA, JSON.stringify(movs));
+    safeLocalStorage.setItem(STORAGE_KEY_CAIXA, JSON.stringify(movs));
   },
 
   async carregarMovimentacoesCaixaAsync(): Promise<{ movs: MovimentacaoCaixa[]; fromSupabase: boolean }> {
@@ -439,7 +458,7 @@ export const storage = {
   // -------------------------------------------------------------
   getFiados(): LancamentoFiado[] {
     try {
-      const data = localStorage.getItem(STORAGE_KEY_FIADOS);
+      const data = safeLocalStorage.getItem(STORAGE_KEY_FIADOS);
       return data ? JSON.parse(data) : [];
     } catch {
       return [];
@@ -447,7 +466,7 @@ export const storage = {
   },
 
   saveFiados(fiados: LancamentoFiado[]): void {
-    localStorage.setItem(STORAGE_KEY_FIADOS, JSON.stringify(fiados));
+    safeLocalStorage.setItem(STORAGE_KEY_FIADOS, JSON.stringify(fiados));
   },
 
   async carregarFiadosAsync(): Promise<{ fiados: LancamentoFiado[]; fromSupabase: boolean }> {

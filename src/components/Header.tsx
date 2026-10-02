@@ -40,14 +40,26 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header className="sticky top-0 z-30 bg-stone-900 border-b border-stone-800 text-stone-100 shadow-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
-        {/* Zone 1: Brand Wordmark (Single text element in display face) */}
+        {/* Zone 1: Brand Wordmark with Official Logo */}
         <button
           onClick={() => setActiveTab('pdv')}
-          className="text-left group cursor-pointer focus:outline-none"
+          className="text-left group cursor-pointer focus:outline-none flex items-center gap-2.5 sm:gap-3"
         >
-          <span className="font-serif text-xl sm:text-2xl font-bold tracking-wider text-amber-200 group-hover:text-amber-100 transition">
-            LIMA SEMIJOIAS
-          </span>
+          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl overflow-hidden bg-stone-950 border border-amber-400/40 p-0.5 shadow-sm group-hover:border-amber-300 transition shrink-0">
+            <img
+              src="/logo-lima.jpg"
+              alt="Logo Lima Semijoias"
+              className="w-full h-full object-cover rounded-[10px]"
+            />
+          </div>
+          <div className="flex flex-col">
+            <span className="font-serif text-lg sm:text-xl font-bold tracking-wider text-amber-200 group-hover:text-amber-100 transition leading-tight">
+              LIMA SEMIJOIAS
+            </span>
+            <span className="text-[10px] uppercase tracking-[0.25em] text-amber-400/80 font-medium hidden sm:block">
+              Semijoias Finas & Acessórios
+            </span>
+          </div>
         </button>
 
         {/* Zone 2: Navigation Links (Desktop) */}

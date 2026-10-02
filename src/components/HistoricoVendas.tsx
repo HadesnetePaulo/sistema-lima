@@ -200,13 +200,16 @@ export const HistoricoVendas: React.FC<HistoricoVendasProps> = ({ vendas, onVerR
 
                       {/* Actions */}
                       <td className="py-3 px-4 text-right">
-                        <button
-                          onClick={() => onVerRecibo(venda)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-stone-900 hover:bg-stone-800 text-white rounded-lg text-xs font-semibold shadow-xs transition active:scale-95 cursor-pointer"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          <span>Ver Recibo</span>
-                        </button>
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => onVerRecibo(venda)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-xs transition active:scale-95 cursor-pointer"
+                            title="Mandar comprovante no WhatsApp"
+                          >
+                            <ReceiptText className="w-3.5 h-3.5" />
+                            <span>Comprovante / WhatsApp</span>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );

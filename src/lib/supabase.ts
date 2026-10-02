@@ -1,5 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Produto, Venda, CartItem, MovimentacaoCaixa, LancamentoFiado } from '../types';
+import { safeLocalStorage } from './safeStorage';
 
 const STORAGE_SUPABASE_URL = 'semijoias_supabase_url';
 const STORAGE_SUPABASE_KEY = 'semijoias_supabase_key';
@@ -19,14 +20,14 @@ export interface SupabaseStatus {
 }
 
 export function getStoredSupabaseConfig() {
-  const url = localStorage.getItem(STORAGE_SUPABASE_URL) || (import.meta as any).env?.VITE_SUPABASE_URL || '';
-  const key = localStorage.getItem(STORAGE_SUPABASE_KEY) || (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
+  const url = safeLocalStorage.getItem(STORAGE_SUPABASE_URL) || (import.meta as any).env?.VITE_SUPABASE_URL || '';
+  const key = safeLocalStorage.getItem(STORAGE_SUPABASE_KEY) || (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
   return { url: url.trim(), key: key.trim() };
 }
 
 export function saveSupabaseConfig(url: string, key: string) {
-  localStorage.setItem(STORAGE_SUPABASE_URL, url.trim());
-  localStorage.setItem(STORAGE_SUPABASE_KEY, key.trim());
+  safeLocalStorage.setItem(STORAGE_SUPABASE_URL, url.trim());
+  safeLocalStorage.setItem(STORAGE_SUPABASE_KEY, key.trim());
 }
 
 let cachedClient: SupabaseClient | null = null;

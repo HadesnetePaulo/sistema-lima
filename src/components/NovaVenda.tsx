@@ -405,18 +405,21 @@ export const NovaVenda: React.FC<NovaVendaProps> = ({
                   >
                     <div>
                       {/* Product Image: Clean Square ratio */}
-                      <div className="aspect-square w-full rounded-xl bg-stone-100 overflow-hidden mb-2.5 relative flex items-center justify-center border border-stone-100">
+                      <div className="aspect-square w-full rounded-xl bg-stone-100 overflow-hidden mb-2.5 relative flex items-center justify-center border border-stone-200/60 shadow-inner">
                         {prod.imagem_url ? (
                           <img
                             src={prod.imagem_url}
                             alt={prod.nome}
                             referrerPolicy="no-referrer"
                             className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                            onError={e => {
+                              (e.target as HTMLImageElement).src = '/logo-lima.jpg';
+                            }}
                           />
                         ) : (
-                          <div className="text-stone-300 flex flex-col items-center justify-center p-2 text-center">
-                            <Sparkles className="w-6 h-6 text-amber-400/80 mb-1" />
-                            <span className="text-[10px] text-stone-400 font-serif">Lima Semijoias</span>
+                          <div className="w-full h-full bg-gradient-to-br from-stone-900 to-stone-950 flex flex-col items-center justify-center p-2 text-center">
+                            <Sparkles className="w-7 h-7 text-amber-400 mb-1" />
+                            <span className="text-[11px] text-amber-200 font-serif font-semibold">Lima Semijoias</span>
                           </div>
                         )}
 

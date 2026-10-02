@@ -14,9 +14,9 @@ export default defineConfig(() => {
         includeAssets: ['icon.svg', 'apple-touch-icon.png'],
         manifest: {
           id: '/',
-          name: 'Aura Semijoias — Vendas & Estoque',
-          short_name: 'Aura Vendas',
-          description: 'Sistema simples e elegante de vendas, controle de estoque e recibos para loja de semijoias.',
+          name: 'Lima Semijoias — Vendas, Estoque & Caixa',
+          short_name: 'Lima Semijoias',
+          description: 'Sistema completo de vendas, estoque, apuração de lucro real e controle de fiados da Lima Semijoias.',
           theme_color: '#1C1917',
           background_color: '#FAF8F5',
           display: 'standalone',
@@ -44,7 +44,7 @@ export default defineConfig(() => {
           ],
         },
         devOptions: {
-          enabled: true,
+          enabled: false,
         },
       }),
     ],

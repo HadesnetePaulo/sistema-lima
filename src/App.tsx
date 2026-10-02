@@ -193,9 +193,11 @@ export default function App() {
       {/* Clean Subtle Footer */}
       <footer className="no-print border-t border-stone-200/80 py-4 text-center text-xs text-stone-500 bg-white/60">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5 text-stone-700">
-            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-            <span className="font-serif font-semibold">Lima Semijoias</span>
+          <div className="flex items-center gap-2 text-stone-700">
+            <div className="w-5 h-5 rounded-md overflow-hidden bg-stone-900 border border-amber-400/40 shrink-0">
+              <img src="/logo-lima.jpg" alt="Lima Semijoias" className="w-full h-full object-cover" />
+            </div>
+            <span className="font-serif font-semibold text-stone-900">Lima Semijoias</span>
             <span>· Sistema de Vendas, Caixa & Fiados (V2)</span>
           </div>
           <p className="text-[11px] text-stone-400">

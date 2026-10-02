@@ -49,18 +49,22 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onSuccess }) => {
       <div className="w-full max-w-sm relative z-10">
         {/* Brand Lockup */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-700 p-0.5 shadow-xl shadow-amber-950/40 mb-3">
-            <div className="w-full h-full bg-[#1C1917] rounded-[14px] flex items-center justify-center">
-              <Sparkles className="w-7 h-7 text-amber-400" />
+          <div className="inline-flex items-center justify-center w-24 h-24 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-700 p-0.5 shadow-2xl shadow-amber-950/60 mb-3">
+            <div className="w-full h-full bg-[#1C1917] rounded-[14px] overflow-hidden flex items-center justify-center p-1">
+              <img
+                src="/logo-lima.jpg"
+                alt="Lima Semijoias"
+                className="w-full h-full object-cover rounded-[10px]"
+              />
             </div>
           </div>
           <h1 className="font-serif text-3xl font-bold tracking-wider text-amber-100">
-            LIMA
+            LIMA SEMIJOIAS
           </h1>
-          <p className="text-xs uppercase tracking-[0.3em] text-stone-400 mt-0.5 font-medium">
-            Semijoias Finas
+          <p className="text-xs uppercase tracking-[0.3em] text-stone-400 mt-1 font-medium">
+            Semijoias Finas & Acessórios
           </p>
-          <div className="mt-3 inline-flex items-center gap-1.5 text-xs text-stone-400">
+          <div className="mt-3 inline-flex items-center gap-1.5 text-xs text-amber-300/80 bg-stone-900/80 border border-stone-800 px-3 py-1 rounded-full">
             <Lock className="w-3.5 h-3.5 text-amber-500" />
             <span>Acesso Interno do Sistema</span>
           </div>
