@@ -122,7 +122,7 @@ function loadDatabase(): ServerStore {
     if (fs.existsSync(DB_FILE)) {
       const raw = fs.readFileSync(DB_FILE, 'utf-8');
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed.produtos) && parsed.produtos.length > 0) {
+      if (Array.isArray(parsed.produtos)) {
         return {
           produtos: parsed.produtos,
           vendas: Array.isArray(parsed.vendas) ? parsed.vendas : [],
@@ -137,9 +137,9 @@ function loadDatabase(): ServerStore {
     console.error('Erro ao ler DB persistente, recriando:', err);
   }
 
-  // Initialize with default
+  // Initialize with empty array if file missing
   const initialStore: ServerStore = {
-    produtos: DEFAULT_PRODUCTS,
+    produtos: [],
     vendas: [],
     caixa: [],
     fiados: [],

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { Produto, CATEGORIAS, CategoriaProduto } from '../types';
 import { storage } from '../lib/storage';
 import { buscarEspecificacoesPorCodigo } from '../lib/barcodeLookup';
@@ -17,9 +17,51 @@ import {
   Camera,
   Loader2,
   Wand2,
-  Zap
+  Zap,
+  Image as ImageIcon,
+  Upload
 } from 'lucide-react';
 import { CameraBarcodeScanner } from './CameraBarcodeScanner';
+
+/**
+ * Compresses and resizes an image file in the browser (max 900px, JPEG 0.85)
+ * Produces crisp, beautiful jewelry photos (~70-120KB) that save instantly without lag.
+ */
+async function compressImageFile(file: File, maxDimension = 900, quality = 0.85): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new window.Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          } else {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(e.target?.result as string);
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+        resolve(dataUrl);
+      };
+      img.onerror = reject;
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
 interface ProdutosEstoqueProps {
   produtos: Produto[];
@@ -35,6 +77,33 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
   const [modalAberto, setModalAberto] = useState(false);
   const [produtoEditando, setProdutoEditando] = useState<Produto | null>(null);
   const [cameraCadastroAberta, setCameraCadastroAberta] = useState(false);
+  const [processandoFoto, setProcessandoFoto] = useState(false);
+  const [mostrarUrlManual, setMostrarUrlManual] = useState(false);
+
+  // Hidden File Inputs for Camera & Gallery
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galeriaInputRef = useRef<HTMLInputElement>(null);
+
+  // Handle Camera or Gallery photo selection with instant optimization
+  const handleFotoSelecionada = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setProcessandoFoto(true);
+    setFormErro(null);
+    try {
+      const dataUrl = await compressImageFile(file, 900, 0.85);
+      setFormImagem(dataUrl);
+    } catch (err: any) {
+      console.error('Erro ao processar imagem:', err);
+      setFormErro('Não foi possível carregar a foto selecionada. Tente novamente.');
+    } finally {
+      setProcessandoFoto(false);
+      // Reset input values so picking the same file again still fires onChange
+      if (cameraInputRef.current) cameraInputRef.current.value = '';
+      if (galeriaInputRef.current) galeriaInputRef.current.value = '';
+    }
+  };
 
   // Form State
   const [formNome, setFormNome] = useState('');
@@ -841,239 +910,414 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
         </div>
       </div>
 
-      {/* Modal: New / Edit Product */}
+      {/* Modal: New / Edit Product with full scrolling and fixed header & footer */}
       {modalAberto && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-          <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-stone-200 overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 bg-stone-900 text-stone-100">
-              <h2 className="font-serif text-lg font-bold text-amber-200">
-                {produtoEditando ? 'Editar Produto' : 'Cadastrar Novo Produto'}
-              </h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-3 sm:p-4 overflow-y-auto overscroll-contain">
+          <div className="w-full max-w-xl bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-stone-200 overflow-hidden my-auto flex flex-col max-h-[92vh] sm:max-h-[88vh] animate-in zoom-in-95 duration-150">
+            {/* Modal Header (Fixed at top) */}
+            <div className="flex items-center justify-between px-5 sm:px-6 py-4 bg-stone-900 text-stone-100 shrink-0 border-b border-stone-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-300 flex items-center justify-center border border-amber-500/30">
+                  {produtoEditando ? <Edit3 className="w-4 h-4" /> : <Package className="w-4 h-4" />}
+                </div>
+                <div>
+                  <h2 className="font-serif text-base sm:text-lg font-bold text-amber-200 leading-tight">
+                    {produtoEditando ? 'Editar Semijoia' : 'Cadastrar Nova Semijoia'}
+                  </h2>
+                  <p className="text-[11px] text-stone-400">
+                    {produtoEditando ? `Código: ${produtoEditando.codigo_barras || produtoEditando.id}` : 'Preencha os dados da peça para estoque e PDV'}
+                  </p>
+                </div>
+              </div>
               <button
+                type="button"
                 onClick={() => setModalAberto(false)}
-                className="text-stone-400 hover:text-stone-100 p-1"
+                className="w-8 h-8 rounded-full bg-stone-800 hover:bg-stone-700 text-stone-400 hover:text-stone-100 flex items-center justify-center transition cursor-pointer"
+                title="Fechar (Esc)"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSalvarProduto} className="p-6 space-y-4">
-              {formErro && (
-                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 shrink-0" />
-                  <span>{formErro}</span>
-                </div>
-              )}
+            {/* Modal Form Container with Scrollable Body and Fixed Footer */}
+            <form onSubmit={handleSalvarProduto} className="flex flex-col flex-1 overflow-hidden min-h-0">
+              {/* Scrollable Form Body */}
+              <div className="p-5 sm:p-6 space-y-4 overflow-y-auto overscroll-contain flex-1">
+                {formErro && (
+                  <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                    <span>{formErro}</span>
+                  </div>
+                )}
 
-              {/* Specs Auto-Filled Banner */}
-              {specsInfo && (
-                <div className="p-3.5 bg-emerald-50/90 border border-emerald-200 rounded-xl text-xs text-emerald-900 space-y-1 animate-in fade-in">
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold flex items-center gap-1.5 text-emerald-800">
-                      <Check className="w-4 h-4 text-emerald-600" />
-                      {specsInfo.texto}
-                    </span>
-                    {specsInfo.fonte && (
-                      <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-medium">
-                        {specsInfo.fonte}
+                {/* Specs Auto-Filled Banner */}
+                {specsInfo && (
+                  <div className="p-3.5 bg-emerald-50/90 border border-emerald-200 rounded-xl text-xs text-emerald-900 space-y-1 animate-in fade-in">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold flex items-center gap-1.5 text-emerald-800">
+                        <Check className="w-4 h-4 text-emerald-600" />
+                        {specsInfo.texto}
                       </span>
+                      {specsInfo.fonte && (
+                        <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-medium">
+                          {specsInfo.fonte}
+                        </span>
+                      )}
+                    </div>
+                    {specsInfo.detalhes && (
+                      <p className="text-[11px] text-emerald-700 leading-relaxed pl-5">
+                        {specsInfo.detalhes}
+                      </p>
                     )}
                   </div>
-                  {specsInfo.detalhes && (
-                    <p className="text-[11px] text-emerald-700 leading-relaxed pl-5">
-                      {specsInfo.detalhes}
-                    </p>
-                  )}
-                </div>
-              )}
+                )}
 
-              {/* Nome */}
-              <div>
-                <label className="block text-xs font-semibold text-stone-700 mb-1">
-                  Nome da Semijoia *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formNome}
-                  onChange={e => setFormNome(e.target.value)}
-                  placeholder="Ex: Anel Solitário Banhado a Ouro 18k"
-                  className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-amber-500 focus:bg-white"
-                />
-              </div>
+                {/* Seção 1: Identificação da Peça */}
+                <div className="bg-stone-50/80 p-4 rounded-2xl border border-stone-200/80 space-y-3.5">
+                  <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider block">
+                    1. Identificação da Peça
+                  </span>
 
-              {/* Categoria & Código de Barras */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-stone-700 mb-1">
-                    Categoria *
-                  </label>
-                  <select
-                    value={formCategoria}
-                    onChange={e => setFormCategoria(e.target.value)}
-                    className="w-full px-3 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-amber-500 focus:bg-white"
-                  >
-                    {CATEGORIAS.filter(c => c !== 'Todas').map(cat => (
-                      <option key={cat} value={cat}>
-                        {cat}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-xs font-semibold text-stone-700">
-                      Código de Barras / Ref
+                  {/* Nome */}
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-700 mb-1">
+                      Nome da Semijoia *
                     </label>
-                    <button
-                      type="button"
-                      onClick={() => setCameraCadastroAberta(true)}
-                      className="text-[11px] text-amber-700 hover:text-amber-900 font-semibold inline-flex items-center gap-1 cursor-pointer bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded-lg border border-amber-200"
-                    >
-                      <Camera className="w-3 h-3 text-amber-600" />
-                      <span>Câmera</span>
-                    </button>
-                  </div>
-                  <div className="relative flex items-center">
                     <input
                       type="text"
-                      value={formCodigo}
-                      onChange={e => setFormCodigo(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          handleBuscarEspecificacoes();
-                        }
-                      }}
-                      placeholder="Ex: 7891001001"
-                      className="w-full pl-3.5 pr-28 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-amber-500 focus:bg-white font-mono"
+                      required
+                      value={formNome}
+                      onChange={e => setFormNome(e.target.value)}
+                      placeholder="Ex: Anel Solitário Banhado a Ouro 18k"
+                      className="w-full px-3.5 py-2.5 bg-white border border-stone-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-amber-500 shadow-2xs font-medium text-stone-900"
                     />
+                  </div>
+
+                  {/* Categoria & Código de Barras */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-stone-700 mb-1">
+                        Categoria *
+                      </label>
+                      <select
+                        value={formCategoria}
+                        onChange={e => setFormCategoria(e.target.value)}
+                        className="w-full px-3.5 py-2.5 bg-white border border-stone-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-amber-500 shadow-2xs font-medium text-stone-800"
+                      >
+                        {CATEGORIAS.filter(c => c !== 'Todas').map(cat => (
+                          <option key={cat} value={cat}>
+                            {cat}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-xs font-semibold text-stone-700">
+                          Código de Barras / Ref
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setCameraCadastroAberta(true)}
+                          className="text-[11px] text-amber-800 hover:text-amber-950 font-semibold inline-flex items-center gap-1 cursor-pointer bg-amber-100 hover:bg-amber-200 px-2 py-0.5 rounded-lg border border-amber-300 transition"
+                        >
+                          <Camera className="w-3 h-3 text-amber-700" />
+                          <span>Câmera</span>
+                        </button>
+                      </div>
+                      <div className="relative flex items-center">
+                        <input
+                          type="text"
+                          value={formCodigo}
+                          onChange={e => setFormCodigo(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleBuscarEspecificacoes();
+                            }
+                          }}
+                          placeholder="Ex: 7891001001"
+                          className="w-full pl-3.5 pr-26 py-2.5 bg-white border border-stone-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-amber-500 shadow-2xs font-mono"
+                        />
+                        <button
+                          type="button"
+                          disabled={carregandoSpecs || !formCodigo.trim()}
+                          onClick={() => handleBuscarEspecificacoes()}
+                          className="absolute right-1 px-2.5 py-1.5 bg-amber-500 hover:bg-amber-400 disabled:bg-stone-200 disabled:text-stone-400 text-stone-950 font-bold text-[11px] rounded-lg transition flex items-center gap-1 shadow-xs cursor-pointer disabled:cursor-not-allowed"
+                          title="Puxar especificações automaticamente pelo código"
+                        >
+                          {carregandoSpecs ? (
+                            <>
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                              <span>Puxando...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Zap className="w-3 h-3 text-stone-950 fill-stone-950" />
+                              <span>Puxar Specs</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Seção 2: Precificação & Lucro */}
+                <div className="bg-amber-50/40 p-4 rounded-2xl border border-amber-200/80 space-y-3.5">
+                  <span className="text-[11px] font-bold text-amber-900 uppercase tracking-wider block">
+                    2. Precificação & Margem de Lucro
+                  </span>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-stone-700 mb-1">
+                        Preço de Venda (R$) *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={formPreco}
+                        onChange={e => setFormPreco(e.target.value)}
+                        placeholder="Ex: 149.90"
+                        className="w-full px-3.5 py-2.5 bg-white border border-stone-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-amber-500 font-mono font-bold text-amber-950 shadow-2xs"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-stone-700 mb-1">
+                        Preço de Custo (R$)
+                      </label>
+                      <input
+                        type="text"
+                        value={formPrecoCusto}
+                        onChange={e => setFormPrecoCusto(e.target.value)}
+                        placeholder="Ex: 52.00 (custo de fábrica)"
+                        className="w-full px-3.5 py-2.5 bg-white border border-stone-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-amber-500 font-mono text-stone-800 shadow-2xs"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Indicador de Lucro em tempo real */}
+                  {Boolean(formPreco && parseFloat(formPreco.replace(',', '.')) > 0) && (
+                    <div className="bg-white/90 p-2.5 rounded-xl border border-amber-200 flex items-center justify-between text-xs">
+                      <span className="text-stone-600">Lucro Bruto Estimado:</span>
+                      {(() => {
+                        const venda = parseFloat(formPreco.replace(',', '.')) || 0;
+                        const custo = parseFloat(formPrecoCusto.replace(',', '.')) || 0;
+                        const lucro = venda - custo;
+                        const margem = venda > 0 ? (lucro / venda) * 100 : 0;
+                        return (
+                          <span className="font-bold text-emerald-800 flex items-center gap-1.5">
+                            <span>{formatCurrency(lucro)}</span>
+                            <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-semibold">
+                              {margem.toFixed(0)}% margem
+                            </span>
+                          </span>
+                        );
+                      })()}
+                    </div>
+                  )}
+                </div>
+
+                {/* Seção 3: Controle de Estoque */}
+                <div className="bg-stone-50/80 p-4 rounded-2xl border border-stone-200/80 space-y-3.5">
+                  <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider block">
+                    3. Saldo Físico & Alerta de Atenção
+                  </span>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-stone-700 mb-1">
+                        Quantidade em Estoque *
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        required
+                        value={formEstoque}
+                        onChange={e => setFormEstoque(e.target.value)}
+                        placeholder="Ex: 8"
+                        className="w-full px-3.5 py-2.5 bg-white border border-stone-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-amber-500 shadow-2xs font-semibold"
+                      />
+                      <p className="text-[10px] text-stone-500 mt-1">Saldo físico disponível no balcão.</p>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-stone-700 mb-1 flex items-center justify-between">
+                        <span>Estoque Mínimo de Alerta *</span>
+                        <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded border border-amber-300">
+                          Selo Atenção
+                        </span>
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        required
+                        value={formEstoqueMinimo}
+                        onChange={e => setFormEstoqueMinimo(e.target.value)}
+                        placeholder="Ex: 3"
+                        className="w-full px-3.5 py-2.5 bg-white border border-amber-300 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-amber-500 shadow-2xs font-semibold text-amber-950"
+                      />
+                      <p className="text-[10px] text-stone-500 mt-1">
+                        Ativa a <strong>borda amarela</strong> e o <strong>selo de atenção</strong> na lista.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Seção 4: Foto da Peça (Câmera ou Galeria) */}
+                <div className="bg-stone-50/80 p-4 rounded-2xl border border-stone-200/80 space-y-3.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider block">
+                      4. Foto da Semijoia (Câmera ou Galeria)
+                    </span>
                     <button
                       type="button"
-                      disabled={carregandoSpecs || !formCodigo.trim()}
-                      onClick={() => handleBuscarEspecificacoes()}
-                      className="absolute right-1 px-2.5 py-1.5 bg-amber-500 hover:bg-amber-400 disabled:bg-stone-200 disabled:text-stone-400 text-stone-950 font-bold text-[11px] rounded-lg transition flex items-center gap-1 shadow-xs cursor-pointer disabled:cursor-not-allowed"
-                      title="Puxar especificações automaticamente pelo código"
+                      onClick={() => setMostrarUrlManual(!mostrarUrlManual)}
+                      className="text-[10px] text-stone-500 hover:text-stone-800 underline cursor-pointer"
                     >
-                      {carregandoSpecs ? (
-                        <>
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                          <span>Puxando...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Zap className="w-3 h-3 text-stone-950 fill-stone-950" />
-                          <span>Puxar Specs</span>
-                        </>
-                      )}
+                      {mostrarUrlManual ? 'Ocultar Link URL' : 'Colar Link URL'}
                     </button>
                   </div>
-                  <p className="text-[10px] text-stone-400 mt-1">
-                    Digite ou escaneie o código para puxar fotos, preços e especificações automaticamente.
-                  </p>
+
+                  {/* Hidden Native File Inputs */}
+                  <input
+                    ref={cameraInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handleFotoSelecionada}
+                    className="hidden"
+                  />
+                  <input
+                    ref={galeriaInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFotoSelecionada}
+                    className="hidden"
+                  />
+
+                  {/* Two Main Photo Action Buttons */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {/* Botão 1: Câmera do Celular */}
+                    <button
+                      type="button"
+                      disabled={processandoFoto}
+                      onClick={() => cameraInputRef.current?.click()}
+                      className="py-3 px-3.5 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-98 text-stone-950 font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer shadow-xs border border-amber-600/30 disabled:opacity-50"
+                    >
+                      <Camera className="w-4 h-4 text-stone-950" />
+                      <div className="text-left leading-tight">
+                        <span className="block font-bold">Tirar Foto na Hora</span>
+                        <span className="text-[10px] font-normal opacity-85">Câmera do celular/PC</span>
+                      </div>
+                    </button>
+
+                    {/* Botão 2: Escolher da Galeria */}
+                    <button
+                      type="button"
+                      disabled={processandoFoto}
+                      onClick={() => galeriaInputRef.current?.click()}
+                      className="py-3 px-3.5 rounded-xl bg-white hover:bg-stone-100 active:scale-98 text-stone-800 font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer shadow-2xs border border-stone-300 disabled:opacity-50"
+                    >
+                      <ImageIcon className="w-4 h-4 text-amber-600" />
+                      <div className="text-left leading-tight">
+                        <span className="block font-bold">Escolher da Galeria</span>
+                        <span className="text-[10px] font-normal text-stone-500">Fotos salvas no celular</span>
+                      </div>
+                    </button>
+                  </div>
+
+                  {/* Processing indicator */}
+                  {processandoFoto && (
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-center gap-2 text-xs font-semibold text-amber-900 animate-pulse">
+                      <Loader2 className="w-4 h-4 animate-spin text-amber-600" />
+                      <span>Otimizando e preparando a foto da joia...</span>
+                    </div>
+                  )}
+
+                  {/* Preview da Imagem Selecionada */}
+                  {Boolean(formImagem && formImagem.trim()) ? (
+                    <div className="bg-white p-3 rounded-2xl border border-stone-200 shadow-2xs flex flex-col sm:flex-row items-center gap-3.5 animate-in fade-in">
+                      <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl overflow-hidden bg-stone-100 border-2 border-amber-400 shadow-sm shrink-0">
+                        <img
+                          src={formImagem}
+                          alt="Prévia da joia"
+                          className="w-full h-full object-cover"
+                          onError={e => {
+                            (e.target as HTMLElement).style.display = 'none';
+                          }}
+                        />
+                      </div>
+
+                      <div className="flex-1 text-center sm:text-left space-y-1.5 min-w-0">
+                        <div className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                          <Check className="w-3 h-3 text-emerald-600" />
+                          <span>Foto Carregada com Sucesso</span>
+                        </div>
+                        <p className="text-xs text-stone-500 leading-tight">
+                          Esta imagem aparecerá no catálogo, na busca rápida do PDV e no recibo impresso.
+                        </p>
+                        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => cameraInputRef.current?.click()}
+                            className="text-[11px] font-semibold text-amber-700 hover:text-amber-900 bg-amber-50 hover:bg-amber-100 px-2.5 py-1 rounded-lg border border-amber-200 transition cursor-pointer"
+                          >
+                            Tirar Outra
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setFormImagem('')}
+                            className="text-[11px] font-semibold text-rose-600 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 px-2.5 py-1 rounded-lg border border-rose-200 transition cursor-pointer flex items-center gap-1"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            <span>Remover Foto</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-2 text-[11px] text-stone-400">
+                      Nenhuma foto vinculada ainda. Use a câmera ou galeria acima para adicionar uma foto.
+                    </div>
+                  )}
+
+                  {/* Campo de URL Manual (Opcional) */}
+                  {mostrarUrlManual && (
+                    <div className="pt-2 border-t border-stone-200/60 space-y-1 animate-in fade-in">
+                      <label className="block text-[11px] font-medium text-stone-600">
+                        Link URL da imagem (opcional):
+                      </label>
+                      <input
+                        type="text"
+                        value={formImagem}
+                        onChange={e => setFormImagem(e.target.value)}
+                        placeholder="https://... ou /images/..."
+                        className="w-full px-3 py-2 bg-white border border-stone-200 rounded-xl text-xs focus:outline-none focus:border-amber-500 font-mono shadow-2xs"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Preços: Venda e Custo */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-stone-700 mb-1">
-                    Preço de Venda (R$) *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formPreco}
-                    onChange={e => setFormPreco(e.target.value)}
-                    placeholder="Ex: 149.90"
-                    className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-amber-500 focus:bg-white font-mono"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-stone-700 mb-1">
-                    Preço de Custo (R$) (V2)
-                  </label>
-                  <input
-                    type="text"
-                    value={formPrecoCusto}
-                    onChange={e => setFormPrecoCusto(e.target.value)}
-                    placeholder="Ex: 45.00 (opcional)"
-                    className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-amber-500 focus:bg-white font-mono"
-                  />
-                  <p className="text-[10px] text-stone-400 mt-1">Usado para apurar o lucro real no caixa.</p>
-                </div>
-              </div>
-
-              {/* Estoque Atual e Limite Mínimo para Alerta de Atenção */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-stone-700 mb-1">
-                    Quantidade em Estoque *
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    required
-                    value={formEstoque}
-                    onChange={e => setFormEstoque(e.target.value)}
-                    placeholder="Ex: 10"
-                    className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-amber-500 focus:bg-white"
-                  />
-                  <p className="text-[10px] text-stone-400 mt-1">Saldo físico disponível para venda.</p>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-stone-700 mb-1 flex items-center justify-between">
-                    <span>Estoque Mínimo de Alerta *</span>
-                    <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded border border-amber-300">
-                      Selo Atenção
-                    </span>
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    required
-                    value={formEstoqueMinimo}
-                    onChange={e => setFormEstoqueMinimo(e.target.value)}
-                    placeholder="Ex: 3"
-                    className="w-full px-3.5 py-2.5 bg-amber-50/50 border border-amber-300 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-amber-500 focus:bg-white font-semibold text-amber-950"
-                  />
-                  <p className="text-[10px] text-amber-800 mt-1">
-                    Abaixo deste valor o produto recebe destaque com <strong>borda amarela</strong> e <strong>selo de atenção</strong>.
-                  </p>
-                </div>
-              </div>
-
-              {/* Imagem URL (opcional) */}
-              <div>
-                <label className="block text-xs font-semibold text-stone-700 mb-1">
-                  URL da Foto (Opcional)
-                </label>
-                <input
-                  type="text"
-                  value={formImagem}
-                  onChange={e => setFormImagem(e.target.value)}
-                  placeholder="https://... ou caminho local da foto"
-                  className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-amber-500 focus:bg-white"
-                />
-              </div>
-
-              {/* Footer actions */}
-              <div className="pt-4 border-t border-stone-100 flex items-center justify-end gap-2">
+              {/* Modal Footer (Sticky at bottom, never cut off!) */}
+              <div className="shrink-0 px-5 sm:px-6 py-3.5 bg-stone-50 border-t border-stone-200 flex items-center justify-between gap-3 shadow-2xs">
                 <button
                   type="button"
                   onClick={() => setModalAberto(false)}
-                  className="px-4 py-2.5 text-xs font-medium text-stone-600 hover:bg-stone-100 rounded-xl transition"
+                  className="px-4 py-2.5 text-xs font-semibold text-stone-600 hover:text-stone-900 hover:bg-stone-200/70 rounded-xl transition cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 bg-stone-900 hover:bg-stone-800 text-white font-semibold text-xs rounded-xl shadow-xs transition"
+                  className="px-6 py-2.5 bg-amber-600 hover:bg-amber-700 active:scale-98 text-white font-semibold text-xs sm:text-sm rounded-xl shadow-xs transition cursor-pointer flex items-center gap-1.5"
                 >
-                  {produtoEditando ? 'Salvar Alterações' : 'Cadastrar Produto'}
+                  <Check className="w-4 h-4" />
+                  <span>{produtoEditando ? 'Salvar Alterações' : 'Cadastrar Produto'}</span>
                 </button>
               </div>
             </form>

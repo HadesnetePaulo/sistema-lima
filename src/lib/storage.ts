@@ -1,6 +1,11 @@
 import { Produto, Venda, CartItem, MovimentacaoCaixa, LancamentoFiado, ResumoClienteFiado } from '../types';
 import { safeLocalStorage, safeSessionStorage } from './safeStorage';
 import {
+  fetchStateFromFirestore,
+  saveStateToFirestore,
+  testFirestoreConnection
+} from './firebase';
+import {
   getSupabaseClient,
   fetchProdutosSupabase,
   addProdutoSupabase,
@@ -112,15 +117,107 @@ async function callServerApi<T>(endpoint: string, options?: RequestInit): Promis
   }
 }
 
+// Helper to merge arrays of entities by ID without overwriting local client additions
+function mergeArraysById<T extends { id: string }>(local: T[], remote: T[]): T[] {
+  const map = new Map<string, T>();
+  for (const item of remote) {
+    if (item && item.id) map.set(item.id, item);
+  }
+  for (const item of local) {
+    if (item && item.id) {
+      const existing = map.get(item.id);
+      map.set(item.id, existing ? { ...existing, ...item } : item);
+    }
+  }
+  return Array.from(map.values());
+}
+
 export const storage = {
-  // Cross-device Server Synchronization
+  // Cloud & Multi-Device Persistent Synchronization (Firebase Firestore + Server)
+  async persistirEmTodasNuvens(): Promise<void> {
+    const produtos = this.getProdutos();
+    const vendas = this.getVendas();
+    const caixa = this.getMovimentacoesCaixa();
+    const fiados = this.getFiados();
+    const masterPassword = this.getMasterPassword();
+
+    // 1. Firebase Firestore (nuvem permanente definitiva)
+    saveStateToFirestore({ produtos, vendas, caixa, fiados }).catch(() => {});
+
+    // 2. Servidor central (/api/sync)
+    callServerApi('/api/sync', {
+      method: 'POST',
+      body: JSON.stringify({
+        produtos,
+        vendas,
+        caixa,
+        fiados,
+        masterPassword
+      })
+    }).catch(() => {});
+  },
+
   async sincronizarServidor(): Promise<{
     produtos: Produto[];
     vendas: Venda[];
     caixa: MovimentacaoCaixa[];
     fiados: LancamentoFiado[];
     masterPassword?: string;
+    fromFirebase?: boolean;
   } | null> {
+    const localProdutos = this.getProdutos();
+    const localVendas = this.getVendas();
+    const localCaixa = this.getMovimentacoesCaixa();
+    const localFiados = this.getFiados();
+
+    // 1. Prioridade máxima: Firebase Firestore na nuvem com Smart Merge
+    try {
+      const firestoreData = await fetchStateFromFirestore();
+      if (firestoreData) {
+        // Smart Merge: Nunca apaga dados que o cliente cadastrou no dispositivo dele!
+        const produtosUnificados = mergeArraysById(localProdutos, firestoreData.produtos || []);
+        const vendasUnificadas = mergeArraysById(localVendas, firestoreData.vendas || []);
+        const caixaUnificado = mergeArraysById(localCaixa, firestoreData.caixa || []);
+        const fiadosUnificados = mergeArraysById(localFiados, firestoreData.fiados || []);
+
+        safeLocalStorage.setItem(STORAGE_KEY_PRODUTOS, JSON.stringify(produtosUnificados));
+        safeLocalStorage.setItem(STORAGE_KEY_VENDAS, JSON.stringify(vendasUnificadas));
+        safeLocalStorage.setItem(STORAGE_KEY_CAIXA, JSON.stringify(caixaUnificado));
+        safeLocalStorage.setItem(STORAGE_KEY_FIADOS, JSON.stringify(fiadosUnificados));
+
+        // Replica a união para o servidor Express local e Firestore
+        callServerApi('/api/sync', {
+          method: 'POST',
+          body: JSON.stringify({
+            produtos: produtosUnificados,
+            vendas: vendasUnificadas,
+            caixa: caixaUnificado,
+            fiados: fiadosUnificados,
+            masterPassword: this.getMasterPassword()
+          })
+        }).catch(() => {});
+
+        saveStateToFirestore({
+          produtos: produtosUnificados,
+          vendas: vendasUnificadas,
+          caixa: caixaUnificado,
+          fiados: fiadosUnificados
+        }).catch(() => {});
+
+        return {
+          produtos: produtosUnificados,
+          vendas: vendasUnificadas,
+          caixa: caixaUnificado,
+          fiados: fiadosUnificados,
+          masterPassword: this.getMasterPassword(),
+          fromFirebase: true
+        };
+      }
+    } catch (err) {
+      console.warn('[Firebase] Fallback para servidor local:', err);
+    }
+
+    // 2. Se Firebase estiver vazio ainda ou offline, busca no servidor Express local com Smart Merge
     const data = await callServerApi<{
       success: boolean;
       produtos: Produto[];
@@ -131,27 +228,35 @@ export const storage = {
     }>('/api/sync');
 
     if (data && data.success) {
-      if (Array.isArray(data.produtos) && data.produtos.length > 0) {
-        this.saveProdutos(data.produtos);
-      }
-      if (Array.isArray(data.vendas)) {
-        this.saveVendas(data.vendas);
-      }
-      if (Array.isArray(data.caixa)) {
-        this.saveMovimentacoesCaixa(data.caixa);
-      }
-      if (Array.isArray(data.fiados)) {
-        this.saveFiados(data.fiados);
-      }
+      const produtosUnificados = mergeArraysById(localProdutos, data.produtos || []);
+      const vendasUnificadas = mergeArraysById(localVendas, data.vendas || []);
+      const caixaUnificado = mergeArraysById(localCaixa, data.caixa || []);
+      const fiadosUnificados = mergeArraysById(localFiados, data.fiados || []);
+
+      safeLocalStorage.setItem(STORAGE_KEY_PRODUTOS, JSON.stringify(produtosUnificados));
+      safeLocalStorage.setItem(STORAGE_KEY_VENDAS, JSON.stringify(vendasUnificadas));
+      safeLocalStorage.setItem(STORAGE_KEY_CAIXA, JSON.stringify(caixaUnificado));
+      safeLocalStorage.setItem(STORAGE_KEY_FIADOS, JSON.stringify(fiadosUnificados));
+
       if (data.masterPassword) {
         safeLocalStorage.setItem(STORAGE_KEY_CUSTOM_PASSWORD, data.masterPassword);
       }
+
+      // Popula o Firebase com a união dos dados
+      saveStateToFirestore({
+        produtos: produtosUnificados,
+        vendas: vendasUnificadas,
+        caixa: caixaUnificado,
+        fiados: fiadosUnificados
+      }).catch(() => {});
+
       return {
-        produtos: this.getProdutos(),
-        vendas: this.getVendas(),
-        caixa: this.getMovimentacoesCaixa(),
-        fiados: this.getFiados(),
-        masterPassword: data.masterPassword
+        produtos: produtosUnificados,
+        vendas: vendasUnificadas,
+        caixa: caixaUnificado,
+        fiados: fiadosUnificados,
+        masterPassword: data.masterPassword,
+        fromFirebase: false
       };
     }
     return null;
@@ -202,21 +307,21 @@ export const storage = {
   getProdutos(): Produto[] {
     try {
       const data = safeLocalStorage.getItem(STORAGE_KEY_PRODUTOS);
-      if (!data) {
+      if (data === null) {
+        // Initial setup only if key was never created
         safeLocalStorage.setItem(STORAGE_KEY_PRODUTOS, JSON.stringify(PRODUTOS_INICIAIS));
         return PRODUTOS_INICIAIS;
       }
       const parsed = JSON.parse(data);
-      if (!Array.isArray(parsed) || parsed.length === 0) {
-        safeLocalStorage.setItem(STORAGE_KEY_PRODUTOS, JSON.stringify(PRODUTOS_INICIAIS));
-        return PRODUTOS_INICIAIS;
+      if (!Array.isArray(parsed)) {
+        return [];
       }
       return parsed.map((p: Produto) => ({
         ...p,
         imagem_url: p.imagem_url ? p.imagem_url.replace('/src/assets/images/', '/images/') : undefined
       }));
     } catch {
-      return PRODUTOS_INICIAIS;
+      return [];
     }
   },
 
@@ -226,6 +331,7 @@ export const storage = {
 
   saveProdutos(produtos: Produto[]): void {
     safeLocalStorage.setItem(STORAGE_KEY_PRODUTOS, JSON.stringify(produtos));
+    this.persistirEmTodasNuvens().catch(() => {});
   },
 
   async carregarProdutosAsync(): Promise<{ produtos: Produto[]; fromSupabase: boolean }> {
@@ -369,6 +475,7 @@ export const storage = {
 
   saveVendas(vendas: Venda[]): void {
     safeLocalStorage.setItem(STORAGE_KEY_VENDAS, JSON.stringify(vendas));
+    this.persistirEmTodasNuvens().catch(() => {});
   },
 
   async carregarVendasAsync(): Promise<{ vendas: Venda[]; fromSupabase: boolean }> {
@@ -516,6 +623,7 @@ export const storage = {
 
   saveMovimentacoesCaixa(movs: MovimentacaoCaixa[]): void {
     safeLocalStorage.setItem(STORAGE_KEY_CAIXA, JSON.stringify(movs));
+    this.persistirEmTodasNuvens().catch(() => {});
   },
 
   async carregarMovimentacoesCaixaAsync(): Promise<{ movs: MovimentacaoCaixa[]; fromSupabase: boolean }> {
@@ -593,6 +701,7 @@ export const storage = {
 
   saveFiados(fiados: LancamentoFiado[]): void {
     safeLocalStorage.setItem(STORAGE_KEY_FIADOS, JSON.stringify(fiados));
+    this.persistirEmTodasNuvens().catch(() => {});
   },
 
   async carregarFiadosAsync(): Promise<{ fiados: LancamentoFiado[]; fromSupabase: boolean }> {
@@ -709,24 +818,142 @@ export const storage = {
   },
 
   // -------------------------------------------------------------
-  // BACKUP & RESTAURAR
+  // BACKUP MANUAL & RESTAURAÇÃO (JSON)
   // -------------------------------------------------------------
-  exportBackup(): string {
-    const data = {
-      app: 'Lima Semijoias',
-      version: '2.0',
-      exportDate: new Date().toISOString(),
-      produtos: this.getProdutos(),
-      vendas: this.getVendas(),
-      caixa: this.getMovimentacoesCaixa(),
-      fiados: this.getFiados()
+  exportBackup(): {
+    jsonString: string;
+    filename: string;
+    stats: {
+      totalProdutos: number;
+      totalVendas: number;
+      totalCaixa: number;
+      totalFiados: number;
+      valorTotalEstoque: number;
+      totalFaturadoVendas: number;
+      saldoDevedorFiados: number;
+      dataHoraLegivel: string;
     };
-    return JSON.stringify(data, null, 2);
+  } {
+    const produtos = this.getProdutos();
+    const vendas = this.getVendas();
+    const caixa = this.getMovimentacoesCaixa();
+    const fiados = this.getFiados();
+    const resumosFiados = this.getResumoFiados();
+
+    const valorTotalEstoque = Number(
+      produtos.reduce((acc, p) => acc + (p.preco * (p.quantidade_estoque || 0)), 0).toFixed(2)
+    );
+    const totalFaturadoVendas = Number(
+      vendas.reduce((acc, v) => acc + (v.total || 0), 0).toFixed(2)
+    );
+    const saldoDevedorFiados = Number(
+      resumosFiados.reduce((acc, f) => acc + (f.saldo_devedor || 0), 0).toFixed(2)
+    );
+
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const dataHoraLegivel = `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()} às ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    const filename = `backup_lima_semijoias_${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}h${pad(now.getMinutes())}.json`;
+
+    const data = {
+      app: 'Lima Semijoias — Gestão & PDV',
+      versao: '2.2',
+      exportado_em: now.toISOString(),
+      data_legivel: dataHoraLegivel,
+      resumo: {
+        total_produtos: produtos.length,
+        total_vendas: vendas.length,
+        total_movimentacoes_caixa: caixa.length,
+        total_fiados: fiados.length,
+        valor_total_estoque: valorTotalEstoque,
+        total_faturado_vendas: totalFaturadoVendas,
+        saldo_devedor_fiados: saldoDevedorFiados,
+      },
+      produtos,
+      vendas,
+      caixa,
+      fiados
+    };
+
+    return {
+      jsonString: JSON.stringify(data, null, 2),
+      filename,
+      stats: {
+        totalProdutos: produtos.length,
+        totalVendas: vendas.length,
+        totalCaixa: caixa.length,
+        totalFiados: fiados.length,
+        valorTotalEstoque,
+        totalFaturadoVendas,
+        saldoDevedorFiados,
+        dataHoraLegivel
+      }
+    };
   },
 
-  importBackup(jsonString: string): boolean {
+  validarArquivoBackup(jsonString: string): {
+    valido: boolean;
+    erro?: string;
+    dados?: any;
+    contagens?: {
+      produtos: number;
+      vendas: number;
+      caixa: number;
+      fiados: number;
+    };
+    exportadoEm?: string;
+  } {
     try {
       const parsed = JSON.parse(jsonString);
+      if (!parsed || typeof parsed !== 'object') {
+        return { valido: false, erro: 'O arquivo selecionado não é um arquivo JSON válido.' };
+      }
+
+      const temProdutos = Array.isArray(parsed.produtos);
+      const temVendas = Array.isArray(parsed.vendas);
+      const temCaixa = Array.isArray(parsed.caixa);
+      const temFiados = Array.isArray(parsed.fiados);
+
+      if (!temProdutos && !temVendas && !temCaixa && !temFiados) {
+        return {
+          valido: false,
+          erro: 'O arquivo não contém dados reconhecidos da Lima Semijoias (produtos, vendas, caixa ou fiados).'
+        };
+      }
+
+      return {
+        valido: true,
+        dados: parsed,
+        contagens: {
+          produtos: temProdutos ? parsed.produtos.length : 0,
+          vendas: temVendas ? parsed.vendas.length : 0,
+          caixa: temCaixa ? parsed.caixa.length : 0,
+          fiados: temFiados ? parsed.fiados.length : 0,
+        },
+        exportadoEm: parsed.data_legivel || parsed.exportado_em || parsed.exportDate || 'Data não especificada'
+      };
+    } catch {
+      return { valido: false, erro: 'Falha ao ler o formato do arquivo JSON de backup.' };
+    }
+  },
+
+  async importBackup(jsonString: string): Promise<{
+    sucesso: boolean;
+    erro?: string;
+    contagens?: {
+      produtos: number;
+      vendas: number;
+      caixa: number;
+      fiados: number;
+    };
+  }> {
+    const validacao = this.validarArquivoBackup(jsonString);
+    if (!validacao.valido || !validacao.dados) {
+      return { sucesso: false, erro: validacao.erro || 'Arquivo de backup inválido.' };
+    }
+
+    try {
+      const parsed = validacao.dados;
       if (Array.isArray(parsed.produtos)) {
         this.saveProdutos(parsed.produtos);
       }
@@ -739,13 +966,127 @@ export const storage = {
       if (Array.isArray(parsed.fiados)) {
         this.saveFiados(parsed.fiados);
       }
-      return true;
-    } catch {
-      return false;
+
+      // Salva imediatamente em ambas as nuvens persistentes (Firestore e Express)
+      await this.persistirEmTodasNuvens();
+
+      return {
+        sucesso: true,
+        contagens: validacao.contagens
+      };
+    } catch (err: any) {
+      return { sucesso: false, erro: err?.message || 'Falha ao restaurar dados do backup.' };
     }
+  },
+
+  // -------------------------------------------------------------
+  // AUDITORIA & PREPARAÇÃO PARA ENTREGA AO CLIENTE (LIMPEZA DE TESTES)
+  // -------------------------------------------------------------
+  analisarDadosEntregaCliente(): {
+    totalProdutos: number;
+    produtosReais: Produto[];
+    produtosTeste: Produto[];
+    totalVendas: number;
+    vendasReais: Venda[];
+    vendasTeste: Venda[];
+    totalCaixa: number;
+    totalFiados: number;
+  } {
+    const produtos = this.getProdutos();
+    const vendas = this.getVendas();
+    const caixa = this.getMovimentacoesCaixa();
+    const fiados = this.getFiados();
+
+    // Identifica todos os IDs de produtos que já foram vendidos pelo cliente
+    const idsVendidos = new Set<string>();
+    for (const v of vendas) {
+      if (Array.isArray(v.itens)) {
+        for (const item of v.itens) {
+          if (item && item.produto_id) idsVendidos.add(item.produto_id);
+        }
+      }
+    }
+
+    const defaultIds = new Set(['prod-001', 'prod-002', 'prod-003', 'prod-004', 'prod-005', 'prod-006']);
+    const produtosReais: Produto[] = [];
+    const produtosTeste: Produto[] = [];
+
+    for (const p of produtos) {
+      const nomeLower = (p.nome || '').toLowerCase().trim();
+      const jaVendido = idsVendidos.has(p.id);
+
+      if (jaVendido) {
+        // Se a joia já foi vendida pelo cliente, é 100% protegida e nunca pode ser apagada!
+        produtosReais.push(p);
+      } else if (defaultIds.has(p.id)) {
+        // Item padrão de demonstração inicial que NUNCA foi vendido
+        produtosTeste.push(p);
+      } else if (nomeLower.includes('teste') || nomeLower === 'test' || nomeLower.includes('mock') || nomeLower.includes('exemplo')) {
+        produtosTeste.push(p);
+      } else {
+        // Produto real cadastrado pelo cliente
+        produtosReais.push(p);
+      }
+    }
+
+    const vendasReais: Venda[] = [];
+    const vendasTeste: Venda[] = [];
+    for (const v of vendas) {
+      const clienteLower = (v.cliente_nome || '').toLowerCase().trim();
+      if (clienteLower === 'teste' || clienteLower === 'test') {
+        vendasTeste.push(v);
+      } else {
+        vendasReais.push(v);
+      }
+    }
+
+    return {
+      totalProdutos: produtos.length,
+      produtosReais,
+      produtosTeste,
+      totalVendas: vendas.length,
+      vendasReais,
+      vendasTeste,
+      totalCaixa: caixa.length,
+      totalFiados: fiados.length
+    };
+  },
+
+  async limparDadosDeTesteEPreservarCliente(opcoes: { removerVendasTeste?: boolean } = {}): Promise<{
+    produtosPreservados: number;
+    produtosRemovidos: number;
+    vendasPreservadas: number;
+    vendasRemovidas: number;
+  }> {
+    const analise = this.analisarDadosEntregaCliente();
+
+    // 1. Preserva todos os produtos reais do cliente e os que já tiveram vendas
+    this.saveProdutos(analise.produtosReais);
+
+    // 2. Preserva as vendas do cliente
+    let vendasFinais = analise.vendasReais;
+    let vendasRemovidasCount = 0;
+    if (opcoes.removerVendasTeste && analise.vendasTeste.length > 0) {
+      vendasFinais = analise.vendasReais;
+      vendasRemovidasCount = analise.vendasTeste.length;
+    } else {
+      vendasFinais = this.getVendas();
+    }
+    this.saveVendas(vendasFinais);
+
+    // Sincroniza em ambas as nuvens persistentes (Firestore e Express)
+    await this.persistirEmTodasNuvens();
+
+    return {
+      produtosPreservados: analise.produtosReais.length,
+      produtosRemovidos: analise.produtosTeste.length,
+      vendasPreservadas: vendasFinais.length,
+      vendasRemovidas: vendasRemovidasCount
+    };
   },
 
   resetCatalogToDefault(): void {
     this.saveProdutos(PRODUTOS_INICIAIS);
+    this.persistirEmTodasNuvens();
   }
 };

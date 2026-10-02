@@ -1,0 +1,107 @@
+{
+  "entities": {
+    "Produto": {
+      "title": "Produto",
+      "description": "Item de joia ou semijoia cadastrado no estoque",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "nome": { "type": "string" },
+        "categoria": { "type": "string" },
+        "codigo_barras": { "type": "string" },
+        "preco": { "type": "number" },
+        "preco_custo": { "type": "number" },
+        "quantidade": { "type": "number" },
+        "quantidade_minima": { "type": "number" },
+        "imagem": { "type": "string" },
+        "created_at": { "type": "string" },
+        "updated_at": { "type": "string" }
+      },
+      "required": ["id", "nome", "categoria", "preco", "quantidade"]
+    },
+    "Venda": {
+      "title": "Venda",
+      "description": "Registro de venda concluída no PDV",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "total": { "type": "number" },
+        "total_custo": { "type": "number" },
+        "desconto": { "type": "number" },
+        "metodo_pagamento": { "type": "string" },
+        "parcelas": { "type": "number" },
+        "data": { "type": "string" },
+        "cliente_nome": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "total", "metodo_pagamento", "data"]
+    },
+    "Caixa": {
+      "title": "Caixa",
+      "description": "Sessão de caixa diário",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "data_abertura": { "type": "string" },
+        "data_fechamento": { "type": "string" },
+        "saldo_inicial": { "type": "number" },
+        "saldo_final": { "type": "number" },
+        "entradas": { "type": "number" },
+        "saidas": { "type": "number" },
+        "vendas_dinheiro": { "type": "number" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "data_abertura", "saldo_inicial", "status"]
+    },
+    "Fiado": {
+      "title": "Fiado",
+      "description": "Controle de conta devedora de cliente",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "cliente_nome": { "type": "string" },
+        "cliente_telefone": { "type": "string" },
+        "total_divida": { "type": "number" },
+        "total_pago": { "type": "number" },
+        "saldo_devedor": { "type": "number" },
+        "status": { "type": "string" },
+        "created_at": { "type": "string" },
+        "updated_at": { "type": "string" }
+      },
+      "required": ["id", "cliente_nome", "total_divida", "saldo_devedor"]
+    },
+    "BackupState": {
+      "title": "BackupState",
+      "description": "Estado consolidado do sistema e backups",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "lastUpdated": { "type": "string" },
+        "payload": { "type": "string" }
+      },
+      "required": ["id", "lastUpdated"]
+    }
+  },
+  "firestore": {
+    "/produtos/{produtoId}": {
+      "schema": { "$ref": "entities/Produto" },
+      "description": "Coleção de produtos e estoque"
+    },
+    "/vendas/{vendaId}": {
+      "schema": { "$ref": "entities/Venda" },
+      "description": "Coleção de histórico de vendas"
+    },
+    "/caixa/{caixaId}": {
+      "schema": { "$ref": "entities/Caixa" },
+      "description": "Coleção de registros de caixa diário"
+    },
+    "/fiados/{fiadoId}": {
+      "schema": { "$ref": "entities/Fiado" },
+      "description": "Coleção de clientes e saldos de fiado"
+    },
+    "/sistema/{docId}": {
+      "schema": { "$ref": "entities/BackupState" },
+      "description": "Documentos de estado sincronizado e backups"
+    }
+  }
+}

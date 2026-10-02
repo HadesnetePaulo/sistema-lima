@@ -150,26 +150,21 @@ export const Header: React.FC<HeaderProps> = ({
             }`}
           >
             <Database className="w-4 h-4 text-emerald-400" />
-            <span>Supabase</span>
+            <span>Config & Backup</span>
           </button>
         </nav>
 
-        {/* Zone 3: Primary Actions (Supabase status pill + PWA Install + Logout/Lock) */}
+        {/* Zone 3: Primary Actions (Cloud status pill + PWA Install + Logout/Lock) */}
         <div className="flex items-center gap-2">
-          {/* Today Date Pill on Desktop */}
-          <div className="hidden 2xl:flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-stone-800/80 border border-stone-750 text-stone-300 font-medium">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span>Balcão Ativo</span>
-          </div>
-
-          {/* Multi-Device Synchronized Indicator */}
-          <div
-            title="Dados salvos no servidor e sincronizados em tempo real entre todos os dispositivos"
-            className="hidden sm:inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full border border-emerald-500/40 bg-emerald-950/60 text-emerald-300 font-medium"
+          {/* Cloud Firebase Indicator */}
+          <button
+            onClick={() => setActiveTab('config')}
+            title="Dados protegidos e sincronizados na nuvem Firebase"
+            className="hidden sm:inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full border border-emerald-500/40 bg-emerald-950/60 text-emerald-300 font-medium hover:bg-emerald-900/60 transition cursor-pointer"
           >
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>Multi-Dispositivo Ativo</span>
-          </div>
+            <span>Nuvem Firebase Ativa</span>
+          </button>
 
           {/* Supabase optional indicator */}
           {supabaseConnected && (
@@ -321,9 +316,12 @@ export const Header: React.FC<HeaderProps> = ({
               >
                 <div className="flex items-center gap-2.5">
                   <Database className="w-4 h-4 text-emerald-400" />
-                  <span>Configurações & Supabase</span>
+                  <span>Configurações & Backup (JSON / Nuvem)</span>
                 </div>
-                <span className={`w-2 h-2 rounded-full ${supabaseConnected ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                <span className="flex items-center gap-1 text-[11px] text-emerald-400 font-medium">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>Nuvem Ativa</span>
+                </span>
               </button>
             </div>
           </div>

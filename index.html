@@ -27,6 +27,26 @@
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <script>
+      // Suppress Vite HMR WebSocket connection errors as HMR is disabled in AI Studio iframe
+      (function() {
+        var origError = console.error;
+        console.error = function() {
+          var msg = arguments && arguments[0];
+          if (typeof msg === 'string' && (msg.indexOf('[vite]') !== -1 || msg.indexOf('WebSocket') !== -1 || msg.indexOf('websocket') !== -1)) {
+            return;
+          }
+          return origError.apply(console, arguments);
+        };
+        var origWarn = console.warn;
+        console.warn = function() {
+          var msg = arguments && arguments[0];
+          if (typeof msg === 'string' && (msg.indexOf('[vite]') !== -1 || msg.indexOf('WebSocket') !== -1 || msg.indexOf('websocket') !== -1)) {
+            return;
+          }
+          return origWarn.apply(console, arguments);
+        };
+      })();
+
       // Garante desinstalação de qualquer Service Worker antigo em modo preview para evitar tela branca
       if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
         navigator.serviceWorker.getRegistrations().then(function(regs) {
