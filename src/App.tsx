@@ -30,6 +30,26 @@ export default function App() {
     typeof navigator !== 'undefined' ? navigator.onLine : true
   );
 
+  // Synchronize dynamic document.title across all pages with Lima Semijoias branding
+  useEffect(() => {
+    if (!isAuthenticated) {
+      document.title = 'Acesso ao Sistema — Lima Semijoias';
+      return;
+    }
+
+    const TITULOS_PAGINAS: Record<TabType, string> = {
+      pdv: 'Nova Venda (PDV) — Lima Semijoias',
+      produtos: 'Catálogo & Estoque — Lima Semijoias',
+      caixa: 'Fluxo de Caixa & Lucro — Lima Semijoias',
+      fiado: 'Controle de Fiados — Lima Semijoias',
+      relatorios: 'Relatórios de Desempenho — Lima Semijoias',
+      vendas: 'Histórico de Vendas — Lima Semijoias',
+      config: 'Configurações & Backup — Lima Semijoias',
+    };
+
+    document.title = TITULOS_PAGINAS[activeTab] || 'Lima Semijoias — Sistema de Vendas & Estoque';
+  }, [activeTab, isAuthenticated]);
+
   // Load initial data (local first, then async Supabase check)
   const carregarDados = useCallback(async () => {
     // 1. Instant local load

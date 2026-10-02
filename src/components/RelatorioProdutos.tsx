@@ -166,12 +166,12 @@ export const RelatorioProdutos: React.FC<RelatorioProdutosProps> = ({
         <div>
           <div className="flex items-center gap-2">
             <BarChart3 className="w-5 h-5 text-amber-600" />
-            <h1 className="font-serif text-xl sm:text-2xl font-bold text-stone-900">
-              Relatório de Produtos & Vendas (V2)
+            <h1 className="font-serif text-xl sm:text-2xl font-bold text-stone-900 tracking-tight">
+              Relatórios & Indicadores de Desempenho
             </h1>
           </div>
           <p className="text-xs text-stone-500 mt-0.5">
-            Ranking simples de mais e menos vendidos por quantidade total no período.
+            Ranking de semijoias mais vendidas, ticket médio, faturamento por período e curva de estoque Lima Semijoias.
           </p>
         </div>
 

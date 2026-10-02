@@ -84,6 +84,36 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
     });
   }, [produtos, busca, categoriaFiltro, filtroStatus]);
 
+  // Executive Desktop Stock Metrics
+  const metricasEstoque = useMemo(() => {
+    let totalPecas = 0;
+    let capitalInvestido = 0;
+    let receitaProjetada = 0;
+    let zerados = 0;
+    let baixos = 0;
+
+    for (const p of produtos) {
+      totalPecas += p.quantidade_estoque;
+      capitalInvestido += (p.preco_custo || 0) * p.quantidade_estoque;
+      receitaProjetada += p.preco * p.quantidade_estoque;
+      if (p.quantidade_estoque <= 0) zerados++;
+      else if (p.quantidade_estoque <= 3) baixos++;
+    }
+
+    const lucroProjetado = receitaProjetada - capitalInvestido;
+    const margemMedia = capitalInvestido > 0 ? (lucroProjetado / capitalInvestido) * 100 : 0;
+
+    return {
+      totalPecas,
+      capitalInvestido,
+      receitaProjetada,
+      lucroProjetado,
+      margemMedia,
+      zerados,
+      baixos
+    };
+  }, [produtos]);
+
   // Open modal for new product
   const handleNovoProduto = () => {
     setProdutoEditando(null);
@@ -234,26 +264,84 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
       {/* Top Banner & Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-stone-200 shadow-xs">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-stone-200/90 shadow-xs">
         <div>
           <div className="flex items-center gap-2">
             <Package className="w-5 h-5 text-amber-600" />
-            <h1 className="font-serif text-2xl font-bold text-stone-900">
-              Controle de Produtos & Estoque
+            <h1 className="font-serif text-2xl font-bold text-stone-900 tracking-tight">
+              Catálogo de Produtos & Controle de Estoque
             </h1>
           </div>
           <p className="text-xs text-stone-500 mt-1">
-            Gerenciamento do catálogo interno, preços e quantidades disponíveis.
+            Gerenciamento do catálogo oficial Lima Semijoias, preços de custo, margens de lucro e código de barras.
           </p>
         </div>
 
         <button
           onClick={handleNovoProduto}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-stone-900 hover:bg-stone-800 text-white font-medium text-xs shadow-xs transition cursor-pointer active:scale-98 whitespace-nowrap"
+          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-stone-900 hover:bg-amber-600 text-white font-semibold text-xs shadow-md transition cursor-pointer active:scale-98 whitespace-nowrap min-h-[42px]"
         >
           <Plus className="w-4 h-4 text-amber-400" />
           <span>Cadastrar Novo Produto</span>
         </button>
+      </div>
+
+      {/* Desktop Inventory Summary KPI Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
+        <div className="bg-white p-4 rounded-2xl border border-stone-200 shadow-xs">
+          <p className="text-[11px] font-bold text-stone-500 uppercase tracking-wider">
+            Peças em Estoque
+          </p>
+          <p className="text-xl sm:text-2xl font-serif font-bold text-stone-900 mt-1 tabular-nums">
+            {metricasEstoque.totalPecas} <span className="text-xs font-sans font-normal text-stone-500">unidades</span>
+          </p>
+          <p className="text-[11px] text-stone-400 mt-0.5">
+            {produtos.length} modelos cadastrados
+          </p>
+        </div>
+
+        <div className="bg-white p-4 rounded-2xl border border-stone-200 shadow-xs">
+          <p className="text-[11px] font-bold text-stone-500 uppercase tracking-wider">
+            Capital Investido (Custo)
+          </p>
+          <p className="text-xl sm:text-2xl font-serif font-bold text-stone-800 mt-1 tabular-nums">
+            {formatCurrency(metricasEstoque.capitalInvestido)}
+          </p>
+          <p className="text-[11px] text-stone-400 mt-0.5">
+            Custo total das semijoias no estoque
+          </p>
+        </div>
+
+        <div className="bg-white p-4 rounded-2xl border border-stone-200 shadow-xs">
+          <p className="text-[11px] font-bold text-stone-500 uppercase tracking-wider">
+            Faturamento Projetado
+          </p>
+          <p className="text-xl sm:text-2xl font-serif font-bold text-stone-900 mt-1 tabular-nums">
+            {formatCurrency(metricasEstoque.receitaProjetada)}
+          </p>
+          <p className="text-[11px] text-stone-400 mt-0.5">
+            Valor a preço de venda de balcão
+          </p>
+        </div>
+
+        <div className="bg-white p-4 rounded-2xl border border-emerald-200 shadow-xs bg-gradient-to-br from-white to-emerald-50/30">
+          <div className="flex items-center justify-between">
+            <p className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider">
+              Lucro Bruto Estimado
+            </p>
+            {metricasEstoque.margemMedia > 0 && (
+              <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded border border-emerald-200">
+                +{metricasEstoque.margemMedia.toFixed(0)}%
+              </span>
+            )}
+          </div>
+          <p className="text-xl sm:text-2xl font-serif font-bold text-emerald-700 mt-1 tabular-nums">
+            {formatCurrency(metricasEstoque.lucroProjetado)}
+          </p>
+          <p className="text-[11px] text-emerald-600/80 mt-0.5">
+            Retorno projetado sobre o estoque
+          </p>
+        </div>
       </div>
 
       {/* Filters Bar */}
@@ -453,7 +541,8 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
                 <th className="py-3 px-4">Categoria</th>
                 <th className="py-3 px-4">Cód. Barras / Ref</th>
                 <th className="py-3 px-4">Preço Venda</th>
-                <th className="py-3 px-4">Preço Custo (V2)</th>
+                <th className="py-3 px-4">Preço Custo</th>
+                <th className="py-3 px-4">Margem Bruta</th>
                 <th className="py-3 px-4 text-center">Estoque Atual</th>
                 <th className="py-3 px-4 text-right">Ações</th>
               </tr>
@@ -461,7 +550,7 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
             <tbody className="divide-y divide-stone-100">
               {produtosFiltrados.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-stone-400">
+                  <td colSpan={8} className="py-12 text-center text-stone-400">
                     Nenhum produto cadastrado ou correspondente ao filtro.
                   </td>
                 </tr>
@@ -469,6 +558,8 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
                 produtosFiltrados.map(prod => {
                   const semEstoque = prod.quantidade_estoque <= 0;
                   const estoqueBaixo = prod.quantidade_estoque > 0 && prod.quantidade_estoque <= 3;
+                  const lucroUnitario = prod.preco_custo ? prod.preco - prod.preco_custo : 0;
+                  const margemPercentual = prod.preco_custo && prod.preco_custo > 0 ? (lucroUnitario / prod.preco_custo) * 100 : 0;
 
                   return (
                     <tr key={prod.id} className="hover:bg-stone-50/80 transition-colors">
@@ -517,20 +608,36 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
                       </td>
 
                       {/* Price */}
-                      <td className="py-3 px-4 font-semibold text-stone-900 tabular-nums">
+                      <td className="py-3 px-4 font-bold text-stone-900 tabular-nums">
                         {formatCurrency(prod.preco)}
                       </td>
 
-                      {/* Cost Price (V2) */}
+                      {/* Cost Price */}
                       <td className="py-3 px-4 text-stone-600 tabular-nums">
                         {prod.preco_custo && prod.preco_custo > 0 ? (
                           <span className="font-medium text-stone-700">
                             {formatCurrency(prod.preco_custo)}
                           </span>
                         ) : (
-                          <span className="text-[11px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                          <span className="text-[11px] text-stone-400 italic">
                             Não informado
                           </span>
+                        )}
+                      </td>
+
+                      {/* Margem Bruta */}
+                      <td className="py-3 px-4 tabular-nums">
+                        {prod.preco_custo && prod.preco_custo > 0 ? (
+                          <div>
+                            <span className="inline-block text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                              +{margemPercentual.toFixed(0)}%
+                            </span>
+                            <p className="text-[10px] text-stone-400 mt-0.5">
+                              Lucro: {formatCurrency(lucroUnitario)}
+                            </p>
+                          </div>
+                        ) : (
+                          <span className="text-stone-300 text-xs">—</span>
                         )}
                       </td>
 

@@ -62,20 +62,20 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </button>
 
-        {/* Zone 2: Navigation Links (Desktop) */}
-        <nav className="hidden xl:flex items-center gap-1">
+        {/* Zone 2: Navigation Links (Desktop from lg breakpoint up) */}
+        <nav className="hidden lg:flex items-center gap-1">
           <button
             onClick={() => setActiveTab('pdv')}
-            className={`px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+            className={`px-3 py-2 rounded-xl text-xs xl:text-sm font-semibold transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
               activeTab === 'pdv'
-                ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
-                : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/60'
+                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-xs'
+                : 'text-stone-400 hover:text-stone-100 hover:bg-stone-800/70'
             }`}
           >
             <ShoppingBag className="w-4 h-4 text-amber-400" />
             <span>Nova Venda</span>
             {cartCount > 0 && (
-              <span className="ml-1 px-1.5 py-0.2 bg-amber-500 text-stone-950 font-bold rounded-full text-[11px]">
+              <span className="ml-1 px-1.5 py-0.2 bg-amber-500 text-stone-950 font-black rounded-full text-[11px]">
                 {cartCount}
               </span>
             )}
@@ -83,22 +83,22 @@ export const Header: React.FC<HeaderProps> = ({
 
           <button
             onClick={() => setActiveTab('produtos')}
-            className={`px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+            className={`px-3 py-2 rounded-xl text-xs xl:text-sm font-semibold transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
               activeTab === 'produtos'
-                ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
-                : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/60'
+                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-xs'
+                : 'text-stone-400 hover:text-stone-100 hover:bg-stone-800/70'
             }`}
           >
-            <Package className="w-4 h-4" />
+            <Package className="w-4 h-4 text-amber-400" />
             <span>Estoque</span>
           </button>
 
           <button
             onClick={() => setActiveTab('caixa')}
-            className={`px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+            className={`px-3 py-2 rounded-xl text-xs xl:text-sm font-semibold transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
               activeTab === 'caixa'
-                ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
-                : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/60'
+                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-xs'
+                : 'text-stone-400 hover:text-stone-100 hover:bg-stone-800/70'
             }`}
           >
             <Wallet className="w-4 h-4 text-emerald-400" />
@@ -107,10 +107,10 @@ export const Header: React.FC<HeaderProps> = ({
 
           <button
             onClick={() => setActiveTab('fiado')}
-            className={`px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+            className={`px-3 py-2 rounded-xl text-xs xl:text-sm font-semibold transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
               activeTab === 'fiado'
-                ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
-                : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/60'
+                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-xs'
+                : 'text-stone-400 hover:text-stone-100 hover:bg-stone-800/70'
             }`}
           >
             <Users className="w-4 h-4 text-amber-400" />
@@ -119,10 +119,10 @@ export const Header: React.FC<HeaderProps> = ({
 
           <button
             onClick={() => setActiveTab('relatorios')}
-            className={`px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+            className={`px-3 py-2 rounded-xl text-xs xl:text-sm font-semibold transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
               activeTab === 'relatorios'
-                ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
-                : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/60'
+                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-xs'
+                : 'text-stone-400 hover:text-stone-100 hover:bg-stone-800/70'
             }`}
           >
             <BarChart3 className="w-4 h-4 text-sky-400" />
@@ -131,36 +131,42 @@ export const Header: React.FC<HeaderProps> = ({
 
           <button
             onClick={() => setActiveTab('vendas')}
-            className={`px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+            className={`px-3 py-2 rounded-xl text-xs xl:text-sm font-semibold transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
               activeTab === 'vendas'
-                ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
-                : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/60'
+                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-xs'
+                : 'text-stone-400 hover:text-stone-100 hover:bg-stone-800/70'
             }`}
           >
-            <ReceiptText className="w-4 h-4" />
+            <ReceiptText className="w-4 h-4 text-amber-400" />
             <span>Histórico</span>
           </button>
 
           <button
             onClick={() => setActiveTab('config')}
-            className={`px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+            className={`px-3 py-2 rounded-xl text-xs xl:text-sm font-semibold transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
               activeTab === 'config'
-                ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
-                : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/60'
+                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-xs'
+                : 'text-stone-400 hover:text-stone-100 hover:bg-stone-800/70'
             }`}
           >
-            <Database className="w-4 h-4" />
+            <Database className="w-4 h-4 text-emerald-400" />
             <span>Supabase</span>
           </button>
         </nav>
 
         {/* Zone 3: Primary Actions (Supabase status pill + PWA Install + Logout/Lock) */}
         <div className="flex items-center gap-2">
+          {/* Today Date Pill on Desktop */}
+          <div className="hidden 2xl:flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-stone-800/80 border border-stone-750 text-stone-300 font-medium">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span>Balcão Ativo</span>
+          </div>
+
           {/* Supabase connection indicator */}
           <button
             onClick={() => setActiveTab('config')}
             title={supabaseConnected ? 'Conectado ao Supabase (Online)' : 'Modo Local / Desconectado (Clique para configurar Supabase)'}
-            className={`hidden sm:inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border transition cursor-pointer ${
+            className={`hidden sm:inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full border transition cursor-pointer ${
               supabaseConnected
                 ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-300 hover:bg-emerald-900/60'
                 : 'bg-stone-800 border-stone-700 text-stone-400 hover:text-stone-200'
@@ -174,8 +180,8 @@ export const Header: React.FC<HeaderProps> = ({
 
           <button
             onClick={onLogout}
-            title="Bloquear sistema / Sair"
-            className="p-2 text-stone-400 hover:text-stone-200 hover:bg-stone-800 rounded-lg transition cursor-pointer"
+            title="Bloquear sistema / Trocar de operador"
+            className="p-2 text-stone-400 hover:text-rose-400 hover:bg-stone-800 rounded-xl transition cursor-pointer"
           >
             <LogOut className="w-4 h-4" />
           </button>
@@ -183,7 +189,7 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       {/* Mobile Bottom Navigation Anchor - Spacious, touch-friendly, safe-area aware */}
-      <div className="xl:hidden fixed bottom-0 left-0 right-0 z-40 bg-stone-950/95 backdrop-blur-lg border-t border-stone-800/90 h-16 pb-safe flex items-center justify-around px-2 shadow-2xl">
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-stone-950/95 backdrop-blur-lg border-t border-stone-800/90 h-16 pb-safe flex items-center justify-around px-2 shadow-2xl">
         <button
           onClick={() => handleSelectTab('pdv')}
           className={`flex-1 h-full flex flex-col items-center justify-center transition-all cursor-pointer select-none active:scale-95 ${
@@ -259,7 +265,7 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Mobile "Mais" Bottom Sheet Drawer */}
       {mobileMenuAberto && (
-        <div className="xl:hidden fixed inset-0 z-50 flex flex-col justify-end bg-black/60 backdrop-blur-xs">
+        <div className="lg:hidden fixed inset-0 z-50 flex flex-col justify-end bg-black/60 backdrop-blur-xs">
           <div className="w-full bg-stone-900 rounded-t-3xl border-t border-stone-800 p-5 shadow-2xl space-y-3 animate-in slide-in-from-bottom duration-200">
             <div className="flex items-center justify-between pb-2 border-b border-stone-800">
               <span className="text-xs uppercase tracking-wider font-semibold text-stone-400">

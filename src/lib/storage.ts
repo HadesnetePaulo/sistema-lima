@@ -91,7 +91,7 @@ const STORAGE_KEY_PRODUTOS = 'lima_semijoias_produtos_v1';
 const STORAGE_KEY_VENDAS = 'lima_semijoias_vendas_v1';
 const STORAGE_KEY_CAIXA = 'lima_semijoias_caixa_v2';
 const STORAGE_KEY_FIADOS = 'lima_semijoias_fiados_v2';
-const STORAGE_KEY_AUTH = 'lima_semijoias_auth_v1';
+const STORAGE_KEY_AUTH = 'lima_semijoias_auth_v2';
 const STORAGE_KEY_CUSTOM_PASSWORD = 'lima_semijoias_custom_password_v1';
 const DEFAULT_PASSWORD = '123456';
 
@@ -105,26 +105,30 @@ export const storage = {
     safeLocalStorage.setItem(STORAGE_KEY_CUSTOM_PASSWORD, newPassword);
   },
 
+  /**
+   * Inicialização direta só se já tiver colocado a senha anteriormente
+   */
   isAuthenticated(): boolean {
-    const session = safeSessionStorage.getItem(STORAGE_KEY_AUTH);
-    if (session === 'false') {
-      return false;
-    }
-    // Retorna true por padrão para que o lojista veja a loja imediatamente no AI Studio
-    return true;
+    const localAuth = safeLocalStorage.getItem(STORAGE_KEY_AUTH);
+    const sessionAuth = safeSessionStorage.getItem(STORAGE_KEY_AUTH);
+    return localAuth === 'authenticated' || sessionAuth === 'authenticated';
   },
 
-  login(password: string): boolean {
+  login(password: string, remember: boolean = true): boolean {
     const currentPass = this.getMasterPassword();
     if (password.trim() === currentPass.trim()) {
-      safeSessionStorage.setItem(STORAGE_KEY_AUTH, 'true');
+      if (remember) {
+        safeLocalStorage.setItem(STORAGE_KEY_AUTH, 'authenticated');
+      }
+      safeSessionStorage.setItem(STORAGE_KEY_AUTH, 'authenticated');
       return true;
     }
     return false;
   },
 
   logout(): void {
-    safeSessionStorage.setItem(STORAGE_KEY_AUTH, 'false');
+    safeLocalStorage.removeItem(STORAGE_KEY_AUTH);
+    safeSessionStorage.removeItem(STORAGE_KEY_AUTH);
   },
 
   // -------------------------------------------------------------

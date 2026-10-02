@@ -57,6 +57,21 @@ export const HistoricoVendas: React.FC<HistoricoVendasProps> = ({ vendas, onVerR
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+      {/* Top Banner */}
+      <div className="bg-white p-5 rounded-2xl border border-stone-200/90 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <ReceiptText className="w-5 h-5 text-amber-600" />
+            <h1 className="font-serif text-2xl font-bold text-stone-900 tracking-tight">
+              Histórico Completo de Vendas & Recibos
+            </h1>
+          </div>
+          <p className="text-xs text-stone-500 mt-1">
+            Consulte todas as vendas finalizadas na Lima Semijoias, gere recibos impressos e envie comprovantes de entrega via WhatsApp.
+          </p>
+        </div>
+      </div>
+
       {/* Header & Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {/* Total Sales */}

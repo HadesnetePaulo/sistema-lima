@@ -202,12 +202,12 @@ export const ControleFiado: React.FC<ControleFiadoProps> = ({ onRefresh }) => {
         <div>
           <div className="flex items-center gap-2">
             <Users className="w-5 h-5 text-amber-600" />
-            <h1 className="font-serif text-xl sm:text-2xl font-bold text-stone-900">
-              Controle de Fiado (V2)
+            <h1 className="font-serif text-xl sm:text-2xl font-bold text-stone-900 tracking-tight">
+              Controle de Fiados & Crediário de Clientes
             </h1>
           </div>
           <p className="text-xs text-stone-500 mt-0.5">
-            Vendas a prazo e quitações. Saldo devedor calculado <strong>automaticamente</strong>.
+            Gestão de vendas a prazo e quitações da Lima Semijoias. Saldo devedor apurado <strong>automaticamente</strong>.
           </p>
         </div>
 

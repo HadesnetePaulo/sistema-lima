@@ -53,6 +53,11 @@ export const NovaVenda: React.FC<NovaVendaProps> = ({
   // Mobile Cart Drawer State
   const [carrinhoMobileAberto, setCarrinhoMobileAberto] = useState(false);
 
+  // Discount & Cash change states
+  const [descontoValor, setDescontoValor] = useState('');
+  const [valorRecebidoDinheiro, setValorRecebidoDinheiro] = useState('');
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+
   // Format currency
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -76,14 +81,33 @@ export const NovaVenda: React.FC<NovaVendaProps> = ({
     });
   }, [produtos, busca, categoriaAtiva]);
 
-  // Cart calculations
+  // Cart calculations with discount & change
   const totalItens = useMemo(() => {
     return carrinho.reduce((sum, item) => sum + item.quantidade, 0);
   }, [carrinho]);
 
-  const valorTotal = useMemo(() => {
+  const valorSubtotal = useMemo(() => {
     return carrinho.reduce((sum, item) => sum + (item.quantidade * item.produto.preco), 0);
   }, [carrinho]);
+
+  const descontoNum = useMemo(() => {
+    const d = parseFloat(descontoValor.replace(',', '.'));
+    return isNaN(d) || d < 0 ? 0 : d;
+  }, [descontoValor]);
+
+  const valorTotal = useMemo(() => {
+    return Math.max(0, valorSubtotal - descontoNum);
+  }, [valorSubtotal, descontoNum]);
+
+  const valorRecebidoNum = useMemo(() => {
+    const v = parseFloat(valorRecebidoDinheiro.replace(',', '.'));
+    return isNaN(v) || v < 0 ? 0 : v;
+  }, [valorRecebidoDinheiro]);
+
+  const trocoCalculado = useMemo(() => {
+    if (formaPagamento !== 'Dinheiro') return 0;
+    return valorRecebidoNum > valorTotal ? valorRecebidoNum - valorTotal : 0;
+  }, [formaPagamento, valorRecebidoNum, valorTotal]);
 
   // Add to cart with atomic stock validation
   const adicionarAoCarrinho = (produto: Produto) => {
@@ -135,7 +159,7 @@ export const NovaVenda: React.FC<NovaVendaProps> = ({
     }
   };
 
-  // USB Barcode Scanner hardware listener
+  // USB Barcode Scanner hardware & desktop shortcuts listener
   useEffect(() => {
     let keyBuffer = '';
     let lastKeyTime = Date.now();
@@ -143,6 +167,28 @@ export const NovaVenda: React.FC<NovaVendaProps> = ({
     const handleKeyDown = (e: KeyboardEvent) => {
       const activeEl = document.activeElement;
       const isSearchInput = activeEl?.getAttribute('data-search-input') === 'true';
+      const isInput = activeEl?.tagName === 'INPUT' || activeEl?.tagName === 'TEXTAREA';
+
+      // Desktop Shortcut: F2 to focus search
+      if (e.key === 'F2') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        return;
+      }
+
+      // Desktop Shortcut: Escape to clear search
+      if (e.key === 'Escape' && isSearchInput) {
+        setBusca('');
+        searchInputRef.current?.blur();
+        return;
+      }
+
+      // Desktop Shortcut: Enter to finalize sale if outside any input
+      if (e.key === 'Enter' && !isInput && carrinho.length > 0 && !isFinalizando) {
+        e.preventDefault();
+        handleFinalizarVenda();
+        return;
+      }
 
       if (e.key === 'Enter') {
         if (keyBuffer.length >= 3 && !isSearchInput) {
@@ -162,7 +208,7 @@ export const NovaVenda: React.FC<NovaVendaProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [produtos, carrinho]);
+  }, [produtos, carrinho, isFinalizando]);
 
   // Decrement from cart
   const removerUnidade = (produtoId: string) => {
@@ -245,6 +291,39 @@ export const NovaVenda: React.FC<NovaVendaProps> = ({
           onClose={() => setCameraAberta(false)}
         />
       )}
+
+      {/* Executive Desktop Header (Visible on sm/desktop) */}
+      <div className="hidden sm:flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 bg-white p-5 rounded-2xl border border-stone-200/90 shadow-xs">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-amber-500/15 text-amber-600 flex items-center justify-center shrink-0">
+              <ShoppingBag className="w-5 h-5 text-amber-600" />
+            </div>
+            <h1 className="font-serif text-2xl font-bold text-stone-900 tracking-tight">
+              Frente de Caixa & Nova Venda
+            </h1>
+          </div>
+          <p className="text-xs text-stone-500 mt-1">
+            Balcão de Atendimento Lima Semijoias · Registro ágil com leitor de código de barras e emissão imediata de recibos.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="bg-stone-50 border border-stone-200/80 rounded-xl px-3.5 py-2 text-right">
+            <p className="text-[10px] uppercase font-bold text-stone-400">Catálogo Ativo</p>
+            <p className="text-xs font-semibold text-stone-800 tabular-nums">
+              {produtos.length} modelos cadastrados
+            </p>
+          </div>
+          <div className="hidden lg:flex items-center gap-2 text-xs text-stone-600 bg-amber-50/80 border border-amber-200/80 px-3.5 py-2 rounded-xl">
+            <span className="font-mono bg-white text-stone-800 px-1.5 py-0.5 rounded border border-stone-300 text-[10px] font-bold shadow-2xs">F2</span>
+            <span>Buscar</span>
+            <span className="text-stone-300">·</span>
+            <span className="font-mono bg-white text-stone-800 px-1.5 py-0.5 rounded border border-stone-300 text-[10px] font-bold shadow-2xs">Enter</span>
+            <span>Finalizar</span>
+          </div>
+        </div>
+      </div>
 
       {/* Notifications */}
       {erroVenda && (
@@ -331,13 +410,17 @@ export const NovaVenda: React.FC<NovaVendaProps> = ({
               <div className="relative flex-1">
                 <Search className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
+                  ref={searchInputRef}
                   type="text"
                   data-search-input="true"
                   value={busca}
                   onChange={e => setBusca(e.target.value)}
-                  placeholder="Buscar semijoia, categoria ou código..."
-                  className="w-full pl-10 pr-9 py-3 bg-stone-50 rounded-xl border border-stone-200 text-sm text-stone-800 placeholder:text-stone-400 focus:outline-none focus:border-amber-500 focus:bg-white transition"
+                  placeholder="Buscar semijoia, categoria ou código... [F2]"
+                  className="w-full pl-10 pr-16 py-3 bg-stone-50 rounded-xl border border-stone-200 text-sm text-stone-800 placeholder:text-stone-400 focus:outline-none focus:border-amber-500 focus:bg-white transition"
                 />
+                <span className="hidden sm:inline-block absolute right-9 top-1/2 -translate-y-1/2 text-[10px] font-mono text-stone-400 bg-stone-200/70 px-1.5 py-0.5 rounded border border-stone-300">
+                  F2
+                </span>
                 {busca && (
                   <button
                     onClick={() => setBusca('')}
@@ -523,19 +606,36 @@ export const NovaVenda: React.FC<NovaVendaProps> = ({
                 <ShoppingBag className="w-8 h-8 text-stone-300 mx-auto mb-2 opacity-70" />
                 <p className="text-xs font-medium text-stone-500">O carrinho está vazio</p>
                 <p className="text-[11px] text-stone-400 mt-0.5">
-                  Bipe o código de barras ou clique nos produtos para adicionar.
+                  Bipe o código de barras [F2] ou clique nos produtos para adicionar.
                 </p>
               </div>
             ) : (
               carrinho.map(item => (
-                <div key={item.produto.id} className="py-2.5 flex items-center justify-between gap-2">
+                <div key={item.produto.id} className="py-2.5 flex items-center justify-between gap-2.5">
+                  {/* Item Image Thumbnail */}
+                  <div className="w-10 h-10 rounded-lg bg-stone-100 overflow-hidden shrink-0 border border-stone-200 flex items-center justify-center">
+                    {item.produto.imagem_url ? (
+                      <img
+                        src={item.produto.imagem_url}
+                        alt={item.produto.nome}
+                        referrerPolicy="no-referrer"
+                        className="w-full h-full object-cover"
+                        onError={e => {
+                          (e.target as HTMLImageElement).src = '/logo-lima.jpg';
+                        }}
+                      />
+                    ) : (
+                      <Sparkles className="w-4 h-4 text-amber-500" />
+                    )}
+                  </div>
+
                   <div className="flex-1 min-w-0 pr-1">
                     <p className="text-xs font-semibold text-stone-900 truncate">
                       {item.produto.nome}
                     </p>
                     <p className="text-[11px] text-stone-500 mt-0.5">
                       {formatCurrency(item.produto.preco)} un · Subtotal:{' '}
-                      <span className="font-medium text-stone-700">
+                      <span className="font-semibold text-stone-800">
                         {formatCurrency(item.quantidade * item.produto.preco)}
                       </span>
                     </p>
@@ -568,7 +668,7 @@ export const NovaVenda: React.FC<NovaVendaProps> = ({
 
                   <button
                     onClick={() => removerDoCarrinho(item.produto.id)}
-                    className="text-stone-300 hover:text-rose-500 p-1 transition"
+                    className="text-stone-300 hover:text-rose-500 p-1 transition cursor-pointer"
                     title="Remover item"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -591,7 +691,7 @@ export const NovaVenda: React.FC<NovaVendaProps> = ({
                   onClick={() => setFormaPagamento(forma)}
                   className={`px-2.5 py-2 rounded-xl text-xs font-medium transition cursor-pointer text-left flex items-center gap-1.5 ${
                     formaPagamento === forma
-                      ? 'bg-amber-100/90 text-amber-950 border border-amber-300 font-semibold'
+                      ? 'bg-amber-100/90 text-amber-950 border border-amber-300 font-semibold shadow-2xs'
                       : 'bg-stone-50 text-stone-700 hover:bg-stone-100 border border-stone-200/70'
                   }`}
                 >
@@ -604,6 +704,62 @@ export const NovaVenda: React.FC<NovaVendaProps> = ({
                 </button>
               ))}
             </div>
+
+            {/* Dinheiro & Calculadora de Troco */}
+            {formaPagamento === 'Dinheiro' && (
+              <div className="mt-3 p-3 bg-emerald-50/80 border border-emerald-200 rounded-xl space-y-2 text-xs animate-in fade-in">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-emerald-950 flex items-center gap-1.5">
+                    <Banknote className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Valor Recebido em Dinheiro (R$):</span>
+                  </span>
+                  {trocoCalculado > 0 && (
+                    <span className="text-[11px] font-bold text-emerald-800 bg-white px-2 py-0.5 rounded border border-emerald-300 shadow-2xs">
+                      Troco: {formatCurrency(trocoCalculado)}
+                    </span>
+                  )}
+                </div>
+
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-stone-500">R$</span>
+                  <input
+                    type="text"
+                    value={valorRecebidoDinheiro}
+                    onChange={e => setValorRecebidoDinheiro(e.target.value)}
+                    placeholder="Ex: 150,00"
+                    className="w-full pl-9 pr-3 py-1.5 bg-white border border-emerald-300 rounded-lg text-xs font-semibold text-stone-900 focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                {/* Quick Shortcuts for cash */}
+                <div className="flex items-center gap-1 pt-0.5 overflow-x-auto no-scrollbar">
+                  {[50, 100, 150, 200].map(val => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => setValorRecebidoDinheiro(val.toString())}
+                      className="px-2 py-1 bg-white hover:bg-emerald-100 text-emerald-900 text-[10px] font-semibold rounded-md border border-emerald-200 transition cursor-pointer"
+                    >
+                      R$ {val}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setValorRecebidoDinheiro(valorTotal.toFixed(2))}
+                    className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded-md transition cursor-pointer"
+                  >
+                    Exato
+                  </button>
+                </div>
+
+                {trocoCalculado > 0 && (
+                  <div className="p-2 bg-emerald-600 text-white rounded-lg flex items-center justify-between text-xs font-bold shadow-xs">
+                    <span>Troco a Devolver:</span>
+                    <span className="text-sm font-black tabular-nums">{formatCurrency(trocoCalculado)}</span>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Client Info input when Fiado is selected */}
             {formaPagamento.toLowerCase().includes('fiado') && (
@@ -639,28 +795,49 @@ export const NovaVenda: React.FC<NovaVendaProps> = ({
                 </div>
               </div>
             )}
+
+            {/* Desconto Opcional */}
+            <div className="pt-2 flex items-center justify-between text-xs border-t border-stone-100">
+              <span className="text-stone-500 font-medium">Aplicar Desconto:</span>
+              <div className="w-28 relative">
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] text-stone-400">R$</span>
+                <input
+                  type="text"
+                  value={descontoValor}
+                  onChange={e => setDescontoValor(e.target.value)}
+                  placeholder="0,00"
+                  className="w-full pl-7 pr-2 py-1 bg-stone-50 border border-stone-200 rounded-lg text-xs text-right font-medium text-stone-800 focus:outline-none focus:border-amber-500"
+                />
+              </div>
+            </div>
           </div>
 
           {/* Cart Summary */}
-          <div className="mt-4 pt-3 border-t border-stone-200 space-y-1.5 text-xs text-stone-600">
+          <div className="mt-3 pt-3 border-t border-stone-200 space-y-1.5 text-xs text-stone-600">
             <div className="flex justify-between">
-              <span>Quantidade de Peças:</span>
-              <span className="font-semibold text-stone-800">{totalItens} un</span>
+              <span>Subtotal ({totalItens} peças):</span>
+              <span className="font-semibold text-stone-800">{formatCurrency(valorSubtotal)}</span>
             </div>
-            <div className="flex justify-between items-baseline pt-1">
-              <span className="text-sm font-semibold text-stone-900">Total da Venda:</span>
+            {descontoNum > 0 && (
+              <div className="flex justify-between text-emerald-700 font-semibold">
+                <span>Desconto Aplicado:</span>
+                <span>- {formatCurrency(descontoNum)}</span>
+              </div>
+            )}
+            <div className="flex justify-between items-baseline pt-1.5 border-t border-stone-100">
+              <span className="text-sm font-bold text-stone-900">Total a Pagar:</span>
               <span className="text-2xl font-bold font-serif text-stone-900 tabular-nums">
                 {formatCurrency(valorTotal)}
               </span>
             </div>
           </div>
 
-          {/* Finalize Button */}
+          {/* Finalize Button with Enter shortcut badge */}
           <button
             type="button"
             disabled={carrinho.length === 0 || isFinalizando}
             onClick={handleFinalizarVenda}
-            className={`w-full mt-4 py-3 rounded-xl font-semibold text-sm transition cursor-pointer flex items-center justify-center gap-2 shadow-md ${
+            className={`w-full mt-4 py-3.5 rounded-xl font-bold text-sm transition cursor-pointer flex items-center justify-center gap-2 shadow-md ${
               carrinho.length === 0 || isFinalizando
                 ? 'bg-stone-200 text-stone-400 cursor-not-allowed shadow-none'
                 : 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-stone-950 active:scale-98 shadow-amber-900/20'
@@ -669,6 +846,9 @@ export const NovaVenda: React.FC<NovaVendaProps> = ({
             <CheckCircle2 className="w-4 h-4" />
             <span>
               {isFinalizando ? 'Registrando Venda...' : `Concluir Venda (${formatCurrency(valorTotal)})`}
+            </span>
+            <span className="hidden lg:inline text-[10px] bg-stone-950/15 text-stone-900 px-1.5 py-0.5 rounded font-mono font-bold ml-1">
+              ↵ Enter
             </span>
           </button>
         </div>

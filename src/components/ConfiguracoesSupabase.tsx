@@ -352,12 +352,12 @@ export const ConfiguracoesSupabase: React.FC<ConfiguracoesSupabaseProps> = ({
         <div>
           <div className="flex items-center gap-2">
             <Database className="w-5 h-5 text-amber-600" />
-            <h1 className="font-serif text-2xl font-bold text-stone-900">
-              Conexão Supabase & Migration V2
+            <h1 className="font-serif text-2xl font-bold text-stone-900 tracking-tight">
+              Configurações, Backup & Supabase
             </h1>
           </div>
           <p className="text-xs text-stone-500 mt-1">
-            Scripts SQL da V2 (Preço de Custo, Caixa e Fiados), credenciais e backup de dados.
+            Gerenciamento de banco de dados na nuvem da Lima Semijoias, senha de acesso do balcão, cópia de segurança e migrações.
           </p>
         </div>
 

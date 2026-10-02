@@ -204,12 +204,12 @@ export const ModuloCaixa: React.FC<ModuloCaixaProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <Wallet className="w-5 h-5 text-amber-600" />
-              <h1 className="font-serif text-xl sm:text-2xl font-bold text-stone-900">
-                Módulo de Caixa & Lucro (V2)
+              <h1 className="font-serif text-xl sm:text-2xl font-bold text-stone-900 tracking-tight">
+                Fluxo de Caixa & Apuração de Lucro Real
               </h1>
             </div>
             <p className="text-xs text-stone-500 mt-0.5">
-              Entradas de vendas, saídas manuais e cálculo do lucro real.
+              Entradas de vendas da Lima Semijoias, despesas operacionais e cálculo detalhado do lucro líquido real.
             </p>
           </div>
 
