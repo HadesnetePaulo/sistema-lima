@@ -4,7 +4,8 @@ import {
   doc, 
   getDoc, 
   setDoc,
-  getDocFromServer
+  getDocFromServer,
+  onSnapshot
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { Produto, Venda, MovimentacaoCaixa, LancamentoFiado } from '../types';
@@ -48,8 +49,9 @@ export async function testFirestoreConnection(): Promise<{ ok: boolean; message:
 export async function fetchStateFromFirestore(): Promise<FirestoreSystemState | null> {
   try {
     const docRef = doc(db, 'sistema', 'dados_principais');
-    const snapshot = await getDoc(docRef);
-    if (snapshot.exists()) {
+    // Always attempt to fetch from server first to get latest multi-device updates
+    const snapshot = await getDocFromServer(docRef).catch(() => getDoc(docRef));
+    if (snapshot && snapshot.exists()) {
       const data = snapshot.data();
       return {
         lastUpdated: data.lastUpdated || new Date().toISOString(),
@@ -91,3 +93,40 @@ export async function saveStateToFirestore(state: {
     return false;
   }
 }
+
+/**
+ * Real-time WebSocket subscription for Instant Multi-Device Synchronization.
+ * Every time any cell phone or computer makes a sale, registers or edits a product,
+ * Firestore broadcasts the new state instantly to all connected devices.
+ */
+export function subscribeToFirestoreState(
+  onUpdate: (state: FirestoreSystemState) => void,
+  onError?: (err: any) => void
+): () => void {
+  try {
+    const docRef = doc(db, 'sistema', 'dados_principais');
+    return onSnapshot(
+      docRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          onUpdate({
+            lastUpdated: data.lastUpdated || new Date().toISOString(),
+            produtos: Array.isArray(data.produtos) ? data.produtos : [],
+            vendas: Array.isArray(data.vendas) ? data.vendas : [],
+            caixa: Array.isArray(data.caixa) ? data.caixa : [],
+            fiados: Array.isArray(data.fiados) ? data.fiados : [],
+          });
+        }
+      },
+      (err) => {
+        console.warn('[Firestore onSnapshot error]', err);
+        if (onError) onError(err);
+      }
+    );
+  } catch (err) {
+    console.warn('[Firestore] Falha ao iniciar listener em tempo real:', err);
+    return () => {};
+  }
+}
+

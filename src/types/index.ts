@@ -106,3 +106,13 @@ export interface ResumoClienteFiado {
   ultimo_lancamento: string;
   historico: LancamentoFiado[];
 }
+
+export interface ContaCliente {
+  nome: string;
+  whatsapp?: string;
+  saldoDevedor: number;
+  totalVendas: number;
+  totalGasto: number;
+  ultimaVenda?: string;
+}
+

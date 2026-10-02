@@ -25,40 +25,58 @@ import { CameraBarcodeScanner } from './CameraBarcodeScanner';
 
 /**
  * Compresses and resizes an image file in the browser (max 900px, JPEG 0.85)
- * Produces crisp, beautiful jewelry photos (~70-120KB) that save instantly without lag.
+ * Resilient to mobile formats (HEIC, RAW, PNG, JPEG) with automatic raw fallback.
  */
 async function compressImageFile(file: File, maxDimension = 900, quality = 0.85): Promise<string> {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const reader = new FileReader();
     reader.onload = e => {
-      const img = new window.Image();
-      img.onload = () => {
-        let { width, height } = img;
-        if (width > maxDimension || height > maxDimension) {
-          if (width > height) {
-            height = Math.round((height * maxDimension) / width);
-            width = maxDimension;
-          } else {
-            width = Math.round((width * maxDimension) / height);
-            height = maxDimension;
+      const rawDataUrl = e.target?.result as string;
+      if (!rawDataUrl) {
+        resolve('');
+        return;
+      }
+      try {
+        const img = new window.Image();
+        img.onload = () => {
+          try {
+            let { width, height } = img;
+            if (width > maxDimension || height > maxDimension) {
+              if (width > height) {
+                height = Math.round((height * maxDimension) / width);
+                width = maxDimension;
+              } else {
+                width = Math.round((width * maxDimension) / height);
+                height = maxDimension;
+              }
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, width);
+            canvas.height = Math.max(1, height);
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+              resolve(rawDataUrl);
+              return;
+            }
+            ctx.drawImage(img, 0, 0, width, height);
+            const dataUrl = canvas.toDataURL('image/jpeg', quality);
+            resolve(dataUrl || rawDataUrl);
+          } catch {
+            resolve(rawDataUrl);
           }
-        }
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          resolve(e.target?.result as string);
-          return;
-        }
-        ctx.drawImage(img, 0, 0, width, height);
-        const dataUrl = canvas.toDataURL('image/jpeg', quality);
-        resolve(dataUrl);
-      };
-      img.onerror = reject;
-      img.src = e.target?.result as string;
+        };
+        img.onerror = () => {
+          // If canvas can't decode (e.g. mobile format), use raw data url
+          resolve(rawDataUrl);
+        };
+        img.src = rawDataUrl;
+      } catch {
+        resolve(rawDataUrl);
+      }
     };
-    reader.onerror = reject;
+    reader.onerror = () => {
+      resolve('');
+    };
     reader.readAsDataURL(file);
   });
 }
@@ -219,11 +237,11 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
     setModalAberto(true);
   };
 
-  // Busca e puxa as especificações completas a partir do código de barras
+  // Busca e puxa as especificações a partir do código de barras
   const handleBuscarEspecificacoes = async (codigoOpcional?: string) => {
     const cod = (codigoOpcional !== undefined ? codigoOpcional : formCodigo).trim();
     if (!cod) {
-      setFormErro('Por favor, informe ou escaneie um código de barras para puxar as especificações.');
+      setFormErro('Por favor, informe ou escaneie um código de barras.');
       return;
     }
 
@@ -232,33 +250,30 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
 
     try {
       const specs = await buscarEspecificacoesPorCodigo(cod);
-      if (specs && specs.found) {
+      if (specs && specs.found && specs.nome) {
         setFormNome(specs.nome);
-        setFormCategoria(specs.categoria);
-        setFormPreco(specs.preco_sugerido.toFixed(2));
-        if (specs.preco_custo_estimado) {
-          setFormPrecoCusto(specs.preco_custo_estimado.toFixed(2));
-        }
-        if (specs.imagem_url) {
-          setFormImagem(specs.imagem_url);
-        }
-        if (!formEstoque || formEstoque === '0') {
-          setFormEstoque(specs.estoque_sugerido.toString());
-        }
-
-        let fonteNome = 'Catálogo Lima Semijoias';
-        if (specs.source === 'catalogo_existente') fonteNome = 'Item Existente no Estoque';
-        if (specs.source === 'api_externa') fonteNome = 'Base Nacional de Produtos (EAN/GTIN)';
-        if (specs.source === 'inteligencia_referencia') fonteNome = 'Inteligência de Joalheria';
+        if (specs.categoria) setFormCategoria(specs.categoria);
+        if (specs.preco_sugerido) setFormPreco(specs.preco_sugerido.toFixed(2));
+        if (specs.preco_custo_estimado) setFormPrecoCusto(specs.preco_custo_estimado.toFixed(2));
+        if (specs.imagem_url) setFormImagem(specs.imagem_url);
+        if (specs.estoque_sugerido) setFormEstoque(specs.estoque_sugerido.toString());
 
         setSpecsInfo({
-          texto: `Especificações de "${specs.nome}" preenchidas com sucesso!`,
-          detalhes: specs.especificacoes_tecnicas,
-          fonte: fonteNome
+          texto: `Peça já existente encontrada: "${specs.nome}"`,
+          detalhes: specs.especificacoes_tecnicas || 'Dados carregados do estoque atual da loja.',
+          fonte: 'Estoque da Loja'
+        });
+      } else {
+        // Código novo: não inventa dados falsos, apenas confirma o código
+        setFormCodigo(cod);
+        setSpecsInfo({
+          texto: `Código ${cod} registrado com sucesso!`,
+          detalhes: 'Preencha o nome, categoria e valor da nova semijoia.',
+          fonte: 'Nova Peça'
         });
       }
     } catch (err: any) {
-      setFormErro(err?.message || 'Não foi possível encontrar especificações para este código.');
+      setFormErro(err?.message || 'Erro ao consultar código.');
     } finally {
       setCarregandoSpecs(false);
     }
@@ -1182,52 +1197,40 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
                     </button>
                   </div>
 
-                  {/* Hidden Native File Inputs */}
-                  <input
-                    ref={cameraInputRef}
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    onChange={handleFotoSelecionada}
-                    className="hidden"
-                  />
-                  <input
-                    ref={galeriaInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFotoSelecionada}
-                    className="hidden"
-                  />
-
-                  {/* Two Main Photo Action Buttons */}
+                  {/* Two Main Photo Action Labels (Native OS Tap - Zero JS Block) */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     {/* Botão 1: Câmera do Celular */}
-                    <button
-                      type="button"
-                      disabled={processandoFoto}
-                      onClick={() => cameraInputRef.current?.click()}
-                      className="py-3 px-3.5 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-98 text-stone-950 font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer shadow-xs border border-amber-600/30 disabled:opacity-50"
-                    >
-                      <Camera className="w-4 h-4 text-stone-950" />
+                    <label className="py-3 px-3.5 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-98 text-stone-950 font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer shadow-xs border border-amber-600/30">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        onChange={handleFotoSelecionada}
+                        disabled={processandoFoto}
+                        className="sr-only"
+                      />
+                      <Camera className="w-4 h-4 text-stone-950 shrink-0" />
                       <div className="text-left leading-tight">
                         <span className="block font-bold">Tirar Foto na Hora</span>
                         <span className="text-[10px] font-normal opacity-85">Câmera do celular/PC</span>
                       </div>
-                    </button>
+                    </label>
 
                     {/* Botão 2: Escolher da Galeria */}
-                    <button
-                      type="button"
-                      disabled={processandoFoto}
-                      onClick={() => galeriaInputRef.current?.click()}
-                      className="py-3 px-3.5 rounded-xl bg-white hover:bg-stone-100 active:scale-98 text-stone-800 font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer shadow-2xs border border-stone-300 disabled:opacity-50"
-                    >
-                      <ImageIcon className="w-4 h-4 text-amber-600" />
+                    <label className="py-3 px-3.5 rounded-xl bg-white hover:bg-stone-100 active:scale-98 text-stone-800 font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer shadow-2xs border border-stone-300">
+                      <input
+                        type="file"
+                        accept="image/png, image/jpeg, image/jpg, image/webp, image/*"
+                        onChange={handleFotoSelecionada}
+                        disabled={processandoFoto}
+                        className="sr-only"
+                      />
+                      <ImageIcon className="w-4 h-4 text-amber-600 shrink-0" />
                       <div className="text-left leading-tight">
                         <span className="block font-bold">Escolher da Galeria</span>
                         <span className="text-[10px] font-normal text-stone-500">Fotos salvas no celular</span>
                       </div>
-                    </button>
+                    </label>
                   </div>
 
                   {/* Processing indicator */}

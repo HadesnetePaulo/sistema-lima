@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Produto, CartItem, FormaPagamento, FORMAS_PAGAMENTO, CATEGORIAS, CategoriaProduto, Venda } from '../types';
+import { Produto, CartItem, FormaPagamento, FORMAS_PAGAMENTO, CATEGORIAS, CategoriaProduto, Venda, ContaCliente } from '../types';
 import { storage } from '../lib/storage';
 import { playBeepSuccess, playBeepError } from '../lib/audio';
 import { CameraBarcodeScanner } from './CameraBarcodeScanner';
@@ -19,9 +19,12 @@ import {
   Barcode,
   Camera,
   ChevronUp,
+  ChevronDown,
   X,
   Zap,
-  Users
+  Users,
+  UserPlus,
+  Phone
 } from 'lucide-react';
 
 interface NovaVendaProps {
@@ -44,6 +47,51 @@ export const NovaVenda: React.FC<NovaVendaProps> = ({
   const [erroVenda, setErroVenda] = useState<string | null>(null);
   const [sucessoMsg, setSucessoMsg] = useState<string | null>(null);
   const [isFinalizando, setIsFinalizando] = useState(false);
+
+  // Customer Account / Cliente Cadastrado State
+  const [contasClientes, setContasClientes] = useState<ContaCliente[]>(() => storage.getContasClientes());
+  const [clienteSelecionado, setClienteSelecionado] = useState<ContaCliente | null>(null);
+  const [dropdownClienteAberto, setDropdownClienteAberto] = useState(false);
+  const [buscaContaInput, setBuscaContaInput] = useState('');
+  const [criandoNovaConta, setCriandoNovaConta] = useState(false);
+
+  // Update customer accounts on mount or sales change
+  useEffect(() => {
+    setContasClientes(storage.getContasClientes());
+  }, [produtos]);
+
+  const contasFiltradas = useMemo(() => {
+    const q = buscaContaInput.trim().toLowerCase();
+    if (!q) return contasClientes;
+    return contasClientes.filter(c =>
+      c.nome.toLowerCase().includes(q) || (c.whatsapp && c.whatsapp.includes(q))
+    );
+  }, [contasClientes, buscaContaInput]);
+
+  const handleSelecionarConta = (conta: ContaCliente) => {
+    setClienteSelecionado(conta);
+    setClienteNome(conta.nome);
+    setClienteWhatsapp(conta.whatsapp || '');
+    setBuscaContaInput('');
+    setDropdownClienteAberto(false);
+    setCriandoNovaConta(false);
+  };
+
+  const handleLimparConta = () => {
+    setClienteSelecionado(null);
+    setClienteNome('');
+    setClienteWhatsapp('');
+    setBuscaContaInput('');
+    setCriandoNovaConta(false);
+  };
+
+  const handleIniciarNovaConta = () => {
+    setClienteSelecionado(null);
+    setClienteNome(buscaContaInput.trim());
+    setClienteWhatsapp('');
+    setCriandoNovaConta(true);
+    setDropdownClienteAberto(false);
+  };
 
   // Barcode scanner states
   const [cameraAberta, setCameraAberta] = useState(false);
@@ -265,7 +313,11 @@ export const NovaVenda: React.FC<NovaVendaProps> = ({
       setCarrinho([]);
       setClienteNome('');
       setClienteWhatsapp('');
+      setClienteSelecionado(null);
+      setBuscaContaInput('');
+      setCriandoNovaConta(false);
       setCarrinhoMobileAberto(false);
+      setContasClientes(storage.getContasClientes());
       setSucessoMsg(`Venda ${novaVenda.id} registrada com sucesso!`);
       setTimeout(() => setSucessoMsg(null), 3000);
 
@@ -761,40 +813,216 @@ export const NovaVenda: React.FC<NovaVendaProps> = ({
               </div>
             )}
 
-            {/* Client Info input when Fiado is selected */}
-            {formaPagamento.toLowerCase().includes('fiado') && (
-              <div className="mt-3 p-3 bg-amber-50/80 border border-amber-200/90 rounded-xl space-y-2 text-xs animate-in fade-in">
-                <p className="font-semibold text-amber-900 flex items-center gap-1.5">
-                  <Users className="w-3.5 h-3.5 text-amber-700" />
-                  <span>Identificação da Cliente (Fiado V2):</span>
-                </p>
-                <div>
-                  <label className="block text-[11px] font-medium text-stone-700 mb-0.5">
-                    Nome da Cliente *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={clienteNome}
-                    onChange={e => setClienteNome(e.target.value)}
-                    placeholder="Ex: Mariana Castro"
-                    className="w-full px-2.5 py-1.5 bg-white border border-stone-200 rounded-lg text-xs text-stone-900 focus:outline-none focus:border-amber-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-medium text-stone-700 mb-0.5">
-                    WhatsApp (DDD + Número)
-                  </label>
-                  <input
-                    type="text"
-                    value={clienteWhatsapp}
-                    onChange={e => setClienteWhatsapp(e.target.value)}
-                    placeholder="Ex: 11987654321"
-                    className="w-full px-2.5 py-1.5 bg-white border border-stone-200 rounded-lg text-xs font-mono text-stone-900 focus:outline-none focus:border-amber-500"
-                  />
-                </div>
+            {/* Seletor de Conta / Cliente Cadastrado (Frente de Caixa) */}
+            <div className="mt-3 pt-3 border-t border-stone-200/80 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-stone-800 flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Conta da Cliente:</span>
+                </label>
+                {formaPagamento.toLowerCase().includes('fiado') ? (
+                  <span className="text-[10px] font-bold text-amber-900 bg-amber-100 px-2 py-0.5 rounded-md border border-amber-300">
+                    Obrigatório p/ Fiado
+                  </span>
+                ) : (
+                  <span className="text-[10px] text-stone-400 font-medium">
+                    Opcional
+                  </span>
+                )}
               </div>
-            )}
+
+              {/* Se tiver cliente selecionado: exibe Cartão de Conta */}
+              {clienteSelecionado ? (
+                <div className="p-2.5 rounded-xl bg-amber-50/90 border border-amber-300 shadow-2xs space-y-1.5 animate-in fade-in">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-7 h-7 rounded-lg bg-amber-500 text-stone-950 font-bold text-xs flex items-center justify-center shrink-0">
+                        {clienteSelecionado.nome.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="truncate">
+                        <span className="font-bold text-stone-900 text-xs block truncate leading-tight">
+                          {clienteSelecionado.nome}
+                        </span>
+                        {clienteSelecionado.whatsapp && (
+                          <span className="text-[10px] text-stone-500 flex items-center gap-1">
+                            <Phone className="w-2.5 h-2.5" />
+                            {clienteSelecionado.whatsapp}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleLimparConta}
+                      className="text-[11px] text-stone-500 hover:text-stone-800 underline shrink-0 cursor-pointer ml-2"
+                    >
+                      Trocar
+                    </button>
+                  </div>
+
+                  {/* Status da Conta: Débito em aberto ou em dia */}
+                  <div className="pt-1 flex items-center justify-between border-t border-amber-200/70 text-[10px]">
+                    {clienteSelecionado.saldoDevedor > 0 ? (
+                      <span className="text-amber-950 font-semibold flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />
+                        Débito em aberto: <strong>{formatCurrency(clienteSelecionado.saldoDevedor)}</strong>
+                      </span>
+                    ) : (
+                      <span className="text-emerald-700 font-semibold flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
+                        Conta em dia (sem débitos)
+                      </span>
+                    )}
+
+                    {formaPagamento.toLowerCase().includes('fiado') && (
+                      <span className="font-bold text-amber-900">
+                        + {formatCurrency(valorTotal)} nesta venda
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ) : criandoNovaConta ? (
+                /* Formulário rápido de Nova Conta */
+                <div className="p-2.5 bg-stone-50 border border-stone-200 rounded-xl space-y-2 text-xs animate-in fade-in">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-stone-800 flex items-center gap-1 text-[11px]">
+                      <UserPlus className="w-3.5 h-3.5 text-amber-600" />
+                      <span>Cadastrar Nova Cliente:</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleLimparConta}
+                      className="text-[10px] text-stone-500 hover:text-stone-800 underline cursor-pointer"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                  <div>
+                    <input
+                      type="text"
+                      required={formaPagamento.toLowerCase().includes('fiado')}
+                      value={clienteNome}
+                      onChange={e => setClienteNome(e.target.value)}
+                      placeholder="Nome completo da cliente *"
+                      className="w-full px-2.5 py-1.5 bg-white border border-stone-200 rounded-lg text-xs focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+                  <div>
+                    <input
+                      type="text"
+                      value={clienteWhatsapp}
+                      onChange={e => setClienteWhatsapp(e.target.value)}
+                      placeholder="WhatsApp (DDD + Número)"
+                      className="w-full px-2.5 py-1.5 bg-white border border-stone-200 rounded-lg text-xs font-mono focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+                </div>
+              ) : (
+                /* Campo de busca e seleção de conta cadastrada */
+                <div className="space-y-1.5 relative">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={buscaContaInput}
+                      onChange={e => {
+                        setBuscaContaInput(e.target.value);
+                        setDropdownClienteAberto(true);
+                      }}
+                      onFocus={() => setDropdownClienteAberto(true)}
+                      placeholder={contasClientes.length > 0 ? "Buscar conta (ex: Lucineia)..." : "Digite o nome da cliente..."}
+                      className="w-full pl-8 pr-7 py-2 bg-stone-50 border border-stone-200 rounded-xl text-xs text-stone-900 focus:outline-none focus:border-amber-500 focus:bg-white shadow-2xs"
+                    />
+                    <Users className="w-3.5 h-3.5 text-stone-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                    <button
+                      type="button"
+                      onClick={() => setDropdownClienteAberto(!dropdownClienteAberto)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 p-0.5"
+                    >
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  {/* Dropdown de Contas Cadastradas */}
+                  {dropdownClienteAberto && (
+                    <div className="absolute left-0 right-0 z-40 bg-white border border-stone-200 rounded-xl shadow-xl max-h-52 overflow-y-auto divide-y divide-stone-100 text-xs animate-in fade-in">
+                      {contasFiltradas.length > 0 ? (
+                        contasFiltradas.map(conta => (
+                          <button
+                            key={conta.nome}
+                            type="button"
+                            onClick={() => handleSelecionarConta(conta)}
+                            className="w-full text-left p-2.5 hover:bg-amber-50/80 transition flex items-center justify-between gap-2 cursor-pointer"
+                          >
+                            <div className="min-w-0">
+                              <span className="font-semibold text-stone-900 block truncate">
+                                {conta.nome}
+                              </span>
+                              {conta.whatsapp && (
+                                <span className="text-[10px] text-stone-500 block truncate">
+                                  {conta.whatsapp}
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-right shrink-0">
+                              {conta.saldoDevedor > 0 ? (
+                                <span className="text-[10px] font-bold text-amber-900 bg-amber-100 px-2 py-0.5 rounded border border-amber-300">
+                                  Débito: {formatCurrency(conta.saldoDevedor)}
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
+                                  Em dia
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                        ))
+                      ) : (
+                        <div className="p-3 text-center text-stone-400 text-[11px]">
+                          Nenhuma conta encontrada com "{buscaContaInput}".
+                        </div>
+                      )}
+
+                      {/* Opção de cadastrar nova cliente se digitou algo */}
+                      {buscaContaInput.trim() && (
+                        <button
+                          type="button"
+                          onClick={handleIniciarNovaConta}
+                          className="w-full p-2.5 bg-amber-50/70 hover:bg-amber-100/80 text-amber-950 font-bold text-xs text-left flex items-center gap-1.5 transition cursor-pointer"
+                        >
+                          <UserPlus className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                          <span>Cadastrar "<strong>{buscaContaInput}</strong>" como nova conta</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Atalhos rápidos para contas existentes (ex: Lucineia) */}
+                  {contasClientes.length > 0 && !dropdownClienteAberto && (
+                    <div className="flex items-center gap-1 pt-1 overflow-x-auto no-scrollbar">
+                      <span className="text-[10px] text-stone-400 shrink-0">Contas:</span>
+                      {contasClientes.slice(0, 4).map(c => (
+                        <button
+                          key={c.nome}
+                          type="button"
+                          onClick={() => handleSelecionarConta(c)}
+                          className="px-2 py-0.5 bg-stone-100 hover:bg-amber-100 text-stone-700 hover:text-amber-950 text-[10px] font-semibold rounded-md border border-stone-200/80 transition cursor-pointer shrink-0 truncate max-w-[120px]"
+                        >
+                          {c.nome} {c.saldoDevedor > 0 && '⚠️'}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => setCriandoNovaConta(true)}
+                        className="px-1.5 py-0.5 text-amber-700 hover:text-amber-900 text-[10px] font-bold shrink-0 cursor-pointer"
+                      >
+                        + Nova
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
 
             {/* Desconto Opcional */}
             <div className="pt-2 flex items-center justify-between text-xs border-t border-stone-100">
@@ -992,40 +1220,177 @@ export const NovaVenda: React.FC<NovaVendaProps> = ({
                   ))}
                 </div>
 
-                {/* V2: Client Info input in Mobile Drawer */}
-                {formaPagamento.toLowerCase().includes('fiado') && (
-                  <div className="mt-3 p-3.5 bg-amber-50 border border-amber-200/90 rounded-2xl space-y-2.5 text-xs animate-in fade-in">
-                    <p className="font-semibold text-amber-900 flex items-center gap-1.5">
-                      <Users className="w-4 h-4 text-amber-700" />
-                      <span>Identificação da Cliente (Fiado V2):</span>
-                    </p>
-                    <div>
-                      <label className="block text-[11px] font-semibold text-stone-700 mb-1">
-                        Nome da Cliente *
-                      </label>
+                {/* Seletor de Conta / Cliente Cadastrado (Mobile Drawer) */}
+                <div className="mt-3 pt-3 border-t border-stone-200/80 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-stone-800 flex items-center gap-1.5">
+                      <Users className="w-3.5 h-3.5 text-amber-600" />
+                      <span>Conta da Cliente:</span>
+                    </label>
+                    {formaPagamento.toLowerCase().includes('fiado') ? (
+                      <span className="text-[10px] font-bold text-amber-900 bg-amber-100 px-2 py-0.5 rounded-md border border-amber-300">
+                        Obrigatório p/ Fiado
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-stone-400 font-medium">
+                        Opcional
+                      </span>
+                    )}
+                  </div>
+
+                  {clienteSelecionado ? (
+                    <div className="p-3 rounded-xl bg-amber-50 border border-amber-300 shadow-2xs space-y-1.5 animate-in fade-in">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="w-8 h-8 rounded-lg bg-amber-500 text-stone-950 font-bold text-xs flex items-center justify-center shrink-0">
+                            {clienteSelecionado.nome.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="truncate">
+                            <span className="font-bold text-stone-900 text-xs block truncate">
+                              {clienteSelecionado.nome}
+                            </span>
+                            {clienteSelecionado.whatsapp && (
+                              <span className="text-[10px] text-stone-500 block">
+                                {clienteSelecionado.whatsapp}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={handleLimparConta}
+                          className="text-xs font-semibold text-stone-600 hover:text-stone-900 underline shrink-0 cursor-pointer"
+                        >
+                          Trocar
+                        </button>
+                      </div>
+
+                      <div className="pt-1 flex items-center justify-between border-t border-amber-200 text-[10px]">
+                        {clienteSelecionado.saldoDevedor > 0 ? (
+                          <span className="text-amber-950 font-semibold">
+                            ⚠️ Débito anterior: <strong>{formatCurrency(clienteSelecionado.saldoDevedor)}</strong>
+                          </span>
+                        ) : (
+                          <span className="text-emerald-700 font-semibold">
+                            ✓ Conta em dia
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ) : criandoNovaConta ? (
+                    <div className="p-3 bg-white border border-stone-200 rounded-xl space-y-2 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-stone-800 text-[11px] flex items-center gap-1">
+                          <UserPlus className="w-3.5 h-3.5 text-amber-600" />
+                          <span>Cadastrar Nova Cliente:</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleLimparConta}
+                          className="text-[10px] text-stone-500 underline"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
                       <input
                         type="text"
-                        required
+                        required={formaPagamento.toLowerCase().includes('fiado')}
                         value={clienteNome}
                         onChange={e => setClienteNome(e.target.value)}
-                        placeholder="Ex: Mariana Castro"
-                        className="w-full px-3.5 py-2.5 bg-white border border-stone-200 rounded-xl text-xs text-stone-900 focus:outline-none focus:border-amber-500 font-medium"
+                        placeholder="Nome completo da cliente *"
+                        className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-xs"
                       />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-semibold text-stone-700 mb-1">
-                        WhatsApp (DDD + Número)
-                      </label>
                       <input
                         type="text"
                         value={clienteWhatsapp}
                         onChange={e => setClienteWhatsapp(e.target.value)}
-                        placeholder="Ex: 11987654321"
-                        className="w-full px-3.5 py-2.5 bg-white border border-stone-200 rounded-xl text-xs font-mono text-stone-900 focus:outline-none focus:border-amber-500"
+                        placeholder="WhatsApp (DDD + Número)"
+                        className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-xs font-mono"
                       />
                     </div>
-                  </div>
-                )}
+                  ) : (
+                    <div className="space-y-1.5 relative">
+                      <input
+                        type="text"
+                        value={buscaContaInput}
+                        onChange={e => {
+                          setBuscaContaInput(e.target.value);
+                          setDropdownClienteAberto(true);
+                        }}
+                        onFocus={() => setDropdownClienteAberto(true)}
+                        placeholder={contasClientes.length > 0 ? "Buscar conta (ex: Lucineia)..." : "Digite o nome da cliente..."}
+                        className="w-full px-3.5 py-2.5 bg-white border border-stone-200 rounded-xl text-xs text-stone-900 focus:outline-none focus:border-amber-500 shadow-2xs"
+                      />
+
+                      {dropdownClienteAberto && (
+                        <div className="bg-white border border-stone-200 rounded-xl shadow-lg max-h-48 overflow-y-auto divide-y divide-stone-100 text-xs">
+                          {contasFiltradas.length > 0 ? (
+                            contasFiltradas.map(conta => (
+                              <button
+                                key={conta.nome}
+                                type="button"
+                                onClick={() => handleSelecionarConta(conta)}
+                                className="w-full text-left p-2.5 hover:bg-amber-50 flex items-center justify-between"
+                              >
+                                <div>
+                                  <span className="font-semibold block">{conta.nome}</span>
+                                  {conta.whatsapp && <span className="text-[10px] text-stone-500">{conta.whatsapp}</span>}
+                                </div>
+                                {conta.saldoDevedor > 0 ? (
+                                  <span className="text-[10px] font-bold text-amber-900 bg-amber-100 px-2 py-0.5 rounded">
+                                    Débito: {formatCurrency(conta.saldoDevedor)}
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] text-emerald-700 font-semibold">Em dia</span>
+                                )}
+                              </button>
+                            ))
+                          ) : (
+                            <div className="p-2.5 text-center text-stone-400 text-xs">
+                              Nenhuma conta encontrada.
+                            </div>
+                          )}
+
+                          {buscaContaInput.trim() && (
+                            <button
+                              type="button"
+                              onClick={handleIniciarNovaConta}
+                              className="w-full p-2.5 bg-amber-50 text-amber-950 font-bold text-xs text-left flex items-center gap-1.5"
+                            >
+                              <UserPlus className="w-3.5 h-3.5 text-amber-700" />
+                              <span>Cadastrar "{buscaContaInput}" como nova conta</span>
+                            </button>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Atalhos de Contas Frequentes (ex: Lucineia) */}
+                      {contasClientes.length > 0 && !dropdownClienteAberto && (
+                        <div className="flex items-center gap-1 pt-1 overflow-x-auto no-scrollbar">
+                          <span className="text-[10px] text-stone-400 shrink-0">Contas:</span>
+                          {contasClientes.slice(0, 4).map(c => (
+                            <button
+                              key={c.nome}
+                              type="button"
+                              onClick={() => handleSelecionarConta(c)}
+                              className="px-2.5 py-1 bg-white hover:bg-amber-100 text-stone-700 text-[10px] font-semibold rounded-lg border border-stone-200 transition shrink-0"
+                            >
+                              {c.nome} {c.saldoDevedor > 0 && '⚠️'}
+                            </button>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() => setCriandoNovaConta(true)}
+                            className="px-2 py-1 text-amber-700 font-bold text-[10px] shrink-0"
+                          >
+                            + Nova
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Total & Action */}

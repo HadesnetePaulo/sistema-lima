@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Produto, Venda, MovimentacaoCaixa, LancamentoFiado } from './types';
 import { storage } from './lib/storage';
 import { testSupabaseConnection } from './lib/supabase';
+import { subscribeToFirestoreState } from './lib/firebase';
 import { Header, TabType } from './components/Header';
 import { LoginScreen } from './components/LoginScreen';
 import { NovaVenda } from './components/NovaVenda';
@@ -104,12 +105,20 @@ export default function App() {
   useEffect(() => {
     carregarDados();
 
-    // Background polling every 6s for real-time multi-device sync
+    // Real-time multi-device subscription: when ANY phone or PC saves, updates reflect here immediately!
+    const unsubscribeFirestore = subscribeToFirestoreState((cloudState) => {
+      setProdutos(cloudState.produtos);
+      setVendas(cloudState.vendas);
+      setMovimentacoesCaixa(cloudState.caixa);
+      setFiados(cloudState.fiados);
+    });
+
+    // Background polling every 4s for real-time multi-device sync fallback
     const syncInterval = setInterval(() => {
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
         carregarDados();
       }
-    }, 6000);
+    }, 4000);
 
     // Re-sync whenever user focuses the tab/window on their mobile or computer
     const handleFocus = () => {
@@ -126,12 +135,15 @@ export default function App() {
     window.addEventListener('focus', handleFocus);
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
+    document.addEventListener('visibilitychange', handleFocus);
 
     return () => {
+      unsubscribeFirestore();
       clearInterval(syncInterval);
       window.removeEventListener('focus', handleFocus);
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      document.removeEventListener('visibilitychange', handleFocus);
     };
   }, [carregarDados]);
 

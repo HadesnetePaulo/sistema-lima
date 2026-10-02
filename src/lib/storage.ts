@@ -1,4 +1,4 @@
-import { Produto, Venda, CartItem, MovimentacaoCaixa, LancamentoFiado, ResumoClienteFiado } from '../types';
+import { Produto, Venda, CartItem, MovimentacaoCaixa, LancamentoFiado, ResumoClienteFiado, ContaCliente } from '../types';
 import { safeLocalStorage, safeSessionStorage } from './safeStorage';
 import {
   fetchStateFromFirestore,
@@ -117,16 +117,18 @@ async function callServerApi<T>(endpoint: string, options?: RequestInit): Promis
   }
 }
 
-// Helper to merge arrays of entities by ID without overwriting local client additions
+// Helper to merge arrays of entities by ID:
+// Adds local items first, and remote (cloud) items overlay existing IDs so stock updates and new sales are respected across devices!
 function mergeArraysById<T extends { id: string }>(local: T[], remote: T[]): T[] {
   const map = new Map<string, T>();
-  for (const item of remote) {
+  // 1. Local items first (e.g. offline created items)
+  for (const item of local) {
     if (item && item.id) map.set(item.id, item);
   }
-  for (const item of local) {
+  // 2. Remote items (Cloud / Shared Platform) take precedence for existing items
+  for (const item of remote) {
     if (item && item.id) {
-      const existing = map.get(item.id);
-      map.set(item.id, existing ? { ...existing, ...item } : item);
+      map.set(item.id, item);
     }
   }
   return Array.from(map.values());
@@ -815,6 +817,61 @@ export const storage = {
 
     // Sort by largest outstanding debt first
     return resumos.sort((a, b) => b.saldo_devedor - a.saldo_devedor);
+  },
+
+  /**
+   * Retrieves all registered customer accounts across sales and fiados.
+   * Enables selecting an existing customer account at POS ("como se fosse uma conta").
+   */
+  getContasClientes(): ContaCliente[] {
+    const resumosFiados = this.getResumoFiados();
+    const vendas = this.getVendas();
+
+    const contasMap = new Map<string, ContaCliente>();
+
+    // 1. Populate from fiado summaries (existing customer accounts)
+    for (const r of resumosFiados) {
+      if (!r.cliente_nome) continue;
+      const chave = r.cliente_nome.trim().toUpperCase();
+      contasMap.set(chave, {
+        nome: r.cliente_nome.trim(),
+        whatsapp: r.cliente_whatsapp,
+        saldoDevedor: r.saldo_devedor,
+        totalVendas: 0,
+        totalGasto: r.total_compras,
+        ultimaVenda: r.ultimo_lancamento
+      });
+    }
+
+    // 2. Supplement from sales history
+    for (const v of vendas) {
+      if (v.cliente_nome && v.cliente_nome.trim()) {
+        const nomeTrim = v.cliente_nome.trim();
+        const chave = nomeTrim.toUpperCase();
+        const existing = contasMap.get(chave);
+        if (existing) {
+          existing.totalVendas += 1;
+          if (!existing.whatsapp && v.cliente_whatsapp) {
+            existing.whatsapp = v.cliente_whatsapp;
+          }
+          if (v.created_at && (!existing.ultimaVenda || v.created_at > existing.ultimaVenda)) {
+            existing.ultimaVenda = v.created_at;
+          }
+        } else {
+          contasMap.set(chave, {
+            nome: nomeTrim,
+            whatsapp: v.cliente_whatsapp,
+            saldoDevedor: 0,
+            totalVendas: 1,
+            totalGasto: v.total,
+            ultimaVenda: v.created_at
+          });
+        }
+      }
+    }
+
+    // Sort alphabetically by name
+    return Array.from(contasMap.values()).sort((a, b) => a.nome.localeCompare(b.nome));
   },
 
   // -------------------------------------------------------------
