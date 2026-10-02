@@ -43,6 +43,7 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
   const [formPreco, setFormPreco] = useState('');
   const [formPrecoCusto, setFormPrecoCusto] = useState('');
   const [formEstoque, setFormEstoque] = useState('');
+  const [formEstoqueMinimo, setFormEstoqueMinimo] = useState('3');
   const [formImagem, setFormImagem] = useState('');
   const [formErro, setFormErro] = useState<string | null>(null);
   const [carregandoSpecs, setCarregandoSpecs] = useState(false);
@@ -73,11 +74,13 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
       const matchCategoria =
         categoriaFiltro === 'Todas' || prod.categoria === categoriaFiltro;
 
+      const limiteMin = prod.estoque_minimo && prod.estoque_minimo > 0 ? prod.estoque_minimo : 3;
+
       const matchStatus =
         filtroStatus === 'todos'
           ? true
           : filtroStatus === 'baixo'
-          ? prod.quantidade_estoque > 0 && prod.quantidade_estoque <= 3
+          ? prod.quantidade_estoque > 0 && prod.quantidade_estoque <= limiteMin
           : prod.quantidade_estoque <= 0;
 
       return matchBusca && matchCategoria && matchStatus;
@@ -93,11 +96,12 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
     let baixos = 0;
 
     for (const p of produtos) {
+      const limiteMin = p.estoque_minimo && p.estoque_minimo > 0 ? p.estoque_minimo : 3;
       totalPecas += p.quantidade_estoque;
       capitalInvestido += (p.preco_custo || 0) * p.quantidade_estoque;
       receitaProjetada += p.preco * p.quantidade_estoque;
       if (p.quantidade_estoque <= 0) zerados++;
-      else if (p.quantidade_estoque <= 3) baixos++;
+      else if (p.quantidade_estoque <= limiteMin) baixos++;
     }
 
     const lucroProjetado = receitaProjetada - capitalInvestido;
@@ -123,6 +127,7 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
     setFormPreco('');
     setFormPrecoCusto('');
     setFormEstoque('5');
+    setFormEstoqueMinimo('3');
     setFormImagem('');
     setFormErro(null);
     setSpecsInfo(null);
@@ -138,6 +143,7 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
     setFormPreco(prod.preco.toString());
     setFormPrecoCusto(prod.preco_custo ? prod.preco_custo.toString() : '');
     setFormEstoque(prod.quantidade_estoque.toString());
+    setFormEstoqueMinimo((prod.estoque_minimo && prod.estoque_minimo > 0 ? prod.estoque_minimo : 3).toString());
     setFormImagem(prod.imagem_url || '');
     setFormErro(null);
     setSpecsInfo(null);
@@ -224,6 +230,9 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
       return;
     }
 
+    const estoqueMinimoNum = parseInt(formEstoqueMinimo, 10);
+    const finalEstoqueMinimo = !isNaN(estoqueMinimoNum) && estoqueMinimoNum >= 0 ? estoqueMinimoNum : 3;
+
     try {
       if (produtoEditando) {
         await storage.updateProduto(produtoEditando.id, {
@@ -233,6 +242,7 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
           preco: precoNum,
           preco_custo: precoCustoNum,
           quantidade_estoque: estoqueNum,
+          estoque_minimo: finalEstoqueMinimo,
           imagem_url: formImagem.trim() || undefined
         });
       } else {
@@ -243,6 +253,7 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
           preco: precoNum,
           preco_custo: precoCustoNum,
           quantidade_estoque: estoqueNum,
+          estoque_minimo: finalEstoqueMinimo,
           imagem_url: formImagem.trim() || undefined
         });
       }
@@ -344,6 +355,39 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
         </div>
       </div>
 
+      {/* Prominent Visual Alert Banner for Low Stock */}
+      {metricasEstoque.baixos > 0 && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 p-4 bg-amber-50/90 border-2 border-amber-400 rounded-2xl shadow-xs animate-in fade-in">
+          <div className="flex items-start sm:items-center gap-3">
+            <div className="p-2.5 bg-amber-400 text-amber-950 rounded-xl shrink-0 shadow-2xs">
+              <AlertTriangle className="w-5 h-5 fill-amber-950 text-amber-400" />
+            </div>
+            <div>
+              <h3 className="font-bold text-amber-950 text-xs sm:text-sm flex items-center gap-2">
+                <span>Alerta de Reposição de Estoque</span>
+                <span className="px-2 py-0.5 bg-amber-200/80 border border-amber-300 text-amber-900 rounded-full text-[11px] font-extrabold">
+                  {metricasEstoque.baixos} {metricasEstoque.baixos === 1 ? 'peça' : 'peças'}
+                </span>
+              </h3>
+              <p className="text-[11px] text-amber-800 mt-0.5 leading-relaxed">
+                Existem {metricasEstoque.baixos} {metricasEstoque.baixos === 1 ? 'semijoia com estoque igual ou abaixo' : 'semijoias com estoque igual ou abaixo'} do limite mínimo configurado. Elas estão sinalizadas com <strong>borda amarela e selo de atenção</strong> para agilizar a reposição.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setFiltroStatus(filtroStatus === 'baixo' ? 'todos' : 'baixo')}
+            className={`px-4 py-2.5 text-xs font-bold rounded-xl transition shadow-xs cursor-pointer shrink-0 border flex items-center justify-center gap-1.5 ${
+              filtroStatus === 'baixo'
+                ? 'bg-stone-900 text-white border-stone-800 hover:bg-stone-800'
+                : 'bg-amber-400 hover:bg-amber-300 text-amber-950 border-amber-500'
+            }`}
+          >
+            <AlertTriangle className="w-3.5 h-3.5 fill-current" />
+            <span>{filtroStatus === 'baixo' ? 'Ver Todos os Produtos' : `Filtrar ${metricasEstoque.baixos} em Alerta`}</span>
+          </button>
+        </div>
+      )}
+
       {/* Filters Bar */}
       <div className="bg-white p-4 rounded-2xl border border-stone-200 shadow-xs space-y-3">
         <div className="flex flex-col md:flex-row gap-3">
@@ -371,11 +415,16 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
             </button>
             <button
               onClick={() => setFiltroStatus('baixo')}
-              className={`px-3.5 py-2 rounded-lg transition min-h-[36px] whitespace-nowrap ${
-                filtroStatus === 'baixo' ? 'bg-amber-100 text-amber-950 font-bold shadow-xs' : 'text-stone-600 hover:text-stone-900'
+              className={`px-3.5 py-2 rounded-lg transition min-h-[36px] whitespace-nowrap flex items-center gap-1.5 ${
+                filtroStatus === 'baixo'
+                  ? 'bg-amber-400 text-amber-950 font-bold shadow-xs border border-amber-500'
+                  : metricasEstoque.baixos > 0
+                  ? 'bg-amber-100 text-amber-950 font-bold hover:bg-amber-200'
+                  : 'text-stone-600 hover:text-stone-900'
               }`}
             >
-              Estoque Baixo (≤ 3)
+              <AlertTriangle className="w-3.5 h-3.5 fill-amber-500 text-amber-950" />
+              <span>⚠️ Estoque Baixo ({metricasEstoque.baixos})</span>
             </button>
             <button
               onClick={() => setFiltroStatus('zerado')}
@@ -383,7 +432,7 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
                 filtroStatus === 'zerado' ? 'bg-rose-100 text-rose-950 font-bold shadow-xs' : 'text-stone-600 hover:text-stone-900'
               }`}
             >
-              Zerados
+              Zerados ({metricasEstoque.zerados})
             </button>
           </div>
         </div>
@@ -416,13 +465,48 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
             </div>
           ) : (
             produtosFiltrados.map(prod => {
+              const limiteMin = prod.estoque_minimo && prod.estoque_minimo > 0 ? prod.estoque_minimo : 3;
               const semEstoque = prod.quantidade_estoque <= 0;
-              const estoqueBaixo = prod.quantidade_estoque > 0 && prod.quantidade_estoque <= 3;
+              const estoqueBaixo = prod.quantidade_estoque > 0 && prod.quantidade_estoque <= limiteMin;
 
               return (
-                <div key={prod.id} className="p-4 space-y-3">
+                <div
+                  key={prod.id}
+                  className={`p-4 space-y-3 transition-all ${
+                    estoqueBaixo
+                      ? 'bg-amber-50/70 border-2 border-amber-400 rounded-2xl m-2.5 shadow-sm shadow-amber-200/60 ring-2 ring-amber-300/40'
+                      : semEstoque
+                      ? 'bg-rose-50/50 border border-rose-200 rounded-2xl m-2'
+                      : ''
+                  }`}
+                >
+                  {/* Visual Low Stock Alert Seal (Selo de Atenção) */}
+                  {estoqueBaixo && (
+                    <div className="flex items-center justify-between px-3.5 py-2 bg-amber-400 text-amber-950 font-bold text-xs rounded-xl shadow-xs border border-amber-500">
+                      <div className="flex items-center gap-1.5">
+                        <AlertTriangle className="w-4 h-4 fill-amber-950 text-amber-400 shrink-0" />
+                        <span>SELO DE ATENÇÃO: ESTOQUE BAIXO</span>
+                      </div>
+                      <span className="text-[11px] font-extrabold bg-amber-950/15 px-2.5 py-0.5 rounded-full">
+                        {prod.quantidade_estoque} de {limiteMin} un (Mínimo)
+                      </span>
+                    </div>
+                  )}
+
+                  {semEstoque && (
+                    <div className="flex items-center justify-between px-3 py-1.5 bg-rose-100 text-rose-900 font-bold text-xs rounded-xl border border-rose-200">
+                      <span className="flex items-center gap-1.5">
+                        <X className="w-4 h-4 text-rose-600" />
+                        ESTOQUE ZERADO / ESGOTADO
+                      </span>
+                      <span className="text-[11px] font-semibold text-rose-700">0 unidades</span>
+                    </div>
+                  )}
+
                   <div className="flex items-start gap-3.5">
-                    <div className="w-16 h-16 rounded-xl bg-stone-100 overflow-hidden shrink-0 flex items-center justify-center border border-stone-200">
+                    <div className={`w-16 h-16 rounded-xl overflow-hidden shrink-0 flex items-center justify-center border ${
+                      estoqueBaixo ? 'bg-amber-100/50 border-amber-300' : 'bg-stone-100 border-stone-200'
+                    }`}>
                       {prod.imagem_url ? (
                         <img
                           src={prod.imagem_url}
@@ -477,7 +561,11 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
                           -
                         </button>
                         <span className={`px-2.5 py-0.5 rounded text-xs font-bold tabular-nums min-w-[2.5rem] text-center ${
-                          semEstoque ? 'bg-rose-100 text-rose-700' : estoqueBaixo ? 'bg-amber-100 text-amber-800' : 'text-stone-900'
+                          semEstoque
+                            ? 'bg-rose-100 text-rose-700'
+                            : estoqueBaixo
+                            ? 'bg-amber-400 text-amber-950 font-extrabold border border-amber-500 shadow-2xs'
+                            : 'text-stone-900'
                         }`}>
                           {prod.quantidade_estoque} un
                         </span>
@@ -556,17 +644,29 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
                 </tr>
               ) : (
                 produtosFiltrados.map(prod => {
+                  const limiteMin = prod.estoque_minimo && prod.estoque_minimo > 0 ? prod.estoque_minimo : 3;
                   const semEstoque = prod.quantidade_estoque <= 0;
-                  const estoqueBaixo = prod.quantidade_estoque > 0 && prod.quantidade_estoque <= 3;
+                  const estoqueBaixo = prod.quantidade_estoque > 0 && prod.quantidade_estoque <= limiteMin;
                   const lucroUnitario = prod.preco_custo ? prod.preco - prod.preco_custo : 0;
                   const margemPercentual = prod.preco_custo && prod.preco_custo > 0 ? (lucroUnitario / prod.preco_custo) * 100 : 0;
 
                   return (
-                    <tr key={prod.id} className="hover:bg-stone-50/80 transition-colors">
+                    <tr
+                      key={prod.id}
+                      className={`transition-colors ${
+                        estoqueBaixo
+                          ? 'bg-amber-50/90 border-l-4 border-l-amber-500 hover:bg-amber-100/80 font-medium'
+                          : semEstoque
+                          ? 'bg-rose-50/40 border-l-4 border-l-rose-400 hover:bg-rose-50'
+                          : 'hover:bg-stone-50/80'
+                      }`}
+                    >
                       {/* Product Name & Photo */}
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-lg bg-stone-100 overflow-hidden shrink-0 flex items-center justify-center border border-stone-200">
+                          <div className={`w-10 h-10 rounded-lg overflow-hidden shrink-0 flex items-center justify-center border ${
+                            estoqueBaixo ? 'bg-amber-100/50 border-amber-300 ring-2 ring-amber-200' : 'bg-stone-100 border-stone-200'
+                          }`}>
                             {prod.imagem_url ? (
                               <img
                                 src={prod.imagem_url}
@@ -582,9 +682,22 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
                             )}
                           </div>
                           <div className="min-w-0">
-                            <p className="font-semibold text-stone-900 text-xs sm:text-sm">
-                              {prod.nome}
-                            </p>
+                            <div className="flex items-center gap-2">
+                              <p className="font-semibold text-stone-900 text-xs sm:text-sm">
+                                {prod.nome}
+                              </p>
+                              {estoqueBaixo && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-400 text-amber-950 border border-amber-500 shadow-2xs shrink-0">
+                                  <AlertTriangle className="w-3 h-3 fill-amber-950 text-amber-400" />
+                                  Selo de Atenção (Mín: {limiteMin} un)
+                                </span>
+                              )}
+                              {semEstoque && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200 shrink-0">
+                                  Esgotado
+                                </span>
+                              )}
+                            </div>
                             <p className="text-[10px] text-stone-400">ID: {prod.id}</p>
                           </div>
                         </div>
@@ -643,23 +756,25 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
 
                       {/* Stock with quick buttons */}
                       <td className="py-3 px-4 text-center">
-                        <div className="inline-flex items-center gap-2 bg-stone-100 px-2 py-1 rounded-xl">
+                        <div className={`inline-flex items-center gap-2 px-2 py-1 rounded-xl ${
+                          estoqueBaixo ? 'bg-amber-100/80 border border-amber-300' : 'bg-stone-100'
+                        }`}>
                           <button
                             onClick={() => handleAjusteRapido(prod.id, -1)}
                             disabled={prod.quantidade_estoque <= 0}
-                            className="w-5 h-5 rounded bg-white text-stone-700 hover:bg-stone-200 flex items-center justify-center text-xs font-bold disabled:opacity-30 disabled:cursor-not-allowed transition"
+                            className="w-5 h-5 rounded bg-white text-stone-700 hover:bg-stone-200 flex items-center justify-center text-xs font-bold disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer"
                             title="Diminuir 1 un"
                           >
                             -
                           </button>
 
                           <span
-                            className={`px-2 py-0.5 rounded text-xs font-bold tabular-nums ${
+                            className={`px-2.5 py-0.5 rounded text-xs font-bold tabular-nums min-w-[2.5rem] text-center ${
                               semEstoque
-                                ? 'bg-rose-100 text-rose-700'
+                                ? 'bg-rose-100 text-rose-700 border border-rose-200'
                                 : estoqueBaixo
-                                ? 'bg-amber-100 text-amber-800'
-                                : 'text-stone-900'
+                                ? 'bg-amber-400 text-amber-950 font-extrabold border border-amber-500 shadow-2xs'
+                                : 'text-stone-900 bg-white'
                             }`}
                           >
                             {prod.quantidade_estoque} un
@@ -667,12 +782,17 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
 
                           <button
                             onClick={() => handleAjusteRapido(prod.id, 1)}
-                            className="w-5 h-5 rounded bg-white text-stone-700 hover:bg-stone-200 flex items-center justify-center text-xs font-bold transition"
+                            className="w-5 h-5 rounded bg-white text-stone-700 hover:bg-stone-200 flex items-center justify-center text-xs font-bold transition cursor-pointer"
                             title="Aumentar 1 un"
                           >
                             +
                           </button>
                         </div>
+                        {estoqueBaixo && (
+                          <span className="text-[10px] text-amber-900 font-bold block mt-1">
+                            ⚠️ Abaixo do mín. ({limiteMin})
+                          </span>
+                        )}
                       </td>
 
                       {/* Actions */}
@@ -680,7 +800,7 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
                         <div className="flex items-center justify-end gap-1">
                           <button
                             onClick={() => handleEditarProduto(prod)}
-                            className="p-1.5 text-stone-500 hover:text-stone-900 hover:bg-stone-100 rounded-lg transition"
+                            className="p-1.5 text-stone-500 hover:text-stone-900 hover:bg-stone-100 rounded-lg transition cursor-pointer"
                             title="Editar produto"
                           >
                             <Edit3 className="w-4 h-4" />
@@ -704,7 +824,7 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
                           ) : (
                             <button
                               onClick={() => setDeletandoId(prod.id)}
-                              className="p-1.5 text-stone-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                              className="p-1.5 text-stone-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
                               title="Excluir produto"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -886,20 +1006,44 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
                 </div>
               </div>
 
-              {/* Estoque */}
-              <div>
-                <label className="block text-xs font-semibold text-stone-700 mb-1">
-                  Quantidade em Estoque *
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  required
-                  value={formEstoque}
-                  onChange={e => setFormEstoque(e.target.value)}
-                  placeholder="Ex: 10"
-                  className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-amber-500 focus:bg-white"
-                />
+              {/* Estoque Atual e Limite Mínimo para Alerta de Atenção */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-stone-700 mb-1">
+                    Quantidade em Estoque *
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    value={formEstoque}
+                    onChange={e => setFormEstoque(e.target.value)}
+                    placeholder="Ex: 10"
+                    className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-amber-500 focus:bg-white"
+                  />
+                  <p className="text-[10px] text-stone-400 mt-1">Saldo físico disponível para venda.</p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-stone-700 mb-1 flex items-center justify-between">
+                    <span>Estoque Mínimo de Alerta *</span>
+                    <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded border border-amber-300">
+                      Selo Atenção
+                    </span>
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    value={formEstoqueMinimo}
+                    onChange={e => setFormEstoqueMinimo(e.target.value)}
+                    placeholder="Ex: 3"
+                    className="w-full px-3.5 py-2.5 bg-amber-50/50 border border-amber-300 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-amber-500 focus:bg-white font-semibold text-amber-950"
+                  />
+                  <p className="text-[10px] text-amber-800 mt-1">
+                    Abaixo deste valor o produto recebe destaque com <strong>borda amarela</strong> e <strong>selo de atenção</strong>.
+                  </p>
+                </div>
               </div>
 
               {/* Imagem URL (opcional) */}

@@ -50,7 +50,7 @@ export default function App() {
     document.title = TITULOS_PAGINAS[activeTab] || 'Lima Semijoias — Sistema de Vendas & Estoque';
   }, [activeTab, isAuthenticated]);
 
-  // Load initial data (local first, then async Supabase check)
+  // Load initial data (local first, then async server + Supabase check)
   const carregarDados = useCallback(async () => {
     // 1. Instant local load
     setProdutos(storage.getProdutos());
@@ -58,7 +58,20 @@ export default function App() {
     setMovimentacoesCaixa(storage.getMovimentacoesCaixa());
     setFiados(storage.getFiados());
 
-    // 2. Check Supabase connection and sync if available
+    // 2. Multi-device persistent server synchronization
+    try {
+      const serverData = await storage.sincronizarServidor();
+      if (serverData) {
+        setProdutos(serverData.produtos);
+        setVendas(serverData.vendas);
+        setMovimentacoesCaixa(serverData.caixa);
+        setFiados(serverData.fiados);
+      }
+    } catch (err) {
+      console.warn('Sincronização persistente multi-dispositivo offline:', err);
+    }
+
+    // 3. Check Supabase connection and sync if available
     try {
       const conn = await testSupabaseConnection();
       setSupabaseConnected(conn.connected);
@@ -91,6 +104,18 @@ export default function App() {
   useEffect(() => {
     carregarDados();
 
+    // Background polling every 6s for real-time multi-device sync
+    const syncInterval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        carregarDados();
+      }
+    }, 6000);
+
+    // Re-sync whenever user focuses the tab/window on their mobile or computer
+    const handleFocus = () => {
+      carregarDados();
+    };
+
     // Online/Offline detection for PWA
     const handleOnline = () => {
       setIsOnline(true);
@@ -98,10 +123,13 @@ export default function App() {
     };
     const handleOffline = () => setIsOnline(false);
 
+    window.addEventListener('focus', handleFocus);
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
     return () => {
+      clearInterval(syncInterval);
+      window.removeEventListener('focus', handleFocus);
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
@@ -221,7 +249,7 @@ export default function App() {
             <span>· Sistema de Vendas, Caixa & Fiados (V2)</span>
           </div>
           <p className="text-[11px] text-stone-400">
-            Uso interno exclusivo · {supabaseConnected ? 'Sincronizado com Supabase' : 'Armazenamento Local'} · PWA Ativo
+            Uso interno exclusivo · Sincronizado Multi-Dispositivo · PWA Ativo
           </p>
         </div>
       </footer>

@@ -162,19 +162,26 @@ export const Header: React.FC<HeaderProps> = ({
             <span>Balcão Ativo</span>
           </div>
 
-          {/* Supabase connection indicator */}
-          <button
-            onClick={() => setActiveTab('config')}
-            title={supabaseConnected ? 'Conectado ao Supabase (Online)' : 'Modo Local / Desconectado (Clique para configurar Supabase)'}
-            className={`hidden sm:inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full border transition cursor-pointer ${
-              supabaseConnected
-                ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-300 hover:bg-emerald-900/60'
-                : 'bg-stone-800 border-stone-700 text-stone-400 hover:text-stone-200'
-            }`}
+          {/* Multi-Device Synchronized Indicator */}
+          <div
+            title="Dados salvos no servidor e sincronizados em tempo real entre todos os dispositivos"
+            className="hidden sm:inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full border border-emerald-500/40 bg-emerald-950/60 text-emerald-300 font-medium"
           >
-            <span className={`w-2 h-2 rounded-full ${supabaseConnected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
-            <span>{supabaseConnected ? 'Supabase' : 'Modo Local'}</span>
-          </button>
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span>Multi-Dispositivo Ativo</span>
+          </div>
+
+          {/* Supabase optional indicator */}
+          {supabaseConnected && (
+            <button
+              onClick={() => setActiveTab('config')}
+              title="Conectado ao Supabase (Online)"
+              className="hidden md:inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full border border-stone-700 bg-stone-800 text-stone-300 hover:text-stone-100"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+              <span>Supabase</span>
+            </button>
+          )}
 
           <PWAInstallButton />
 

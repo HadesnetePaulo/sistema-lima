@@ -6,6 +6,7 @@ export interface Produto {
   preco: number;
   preco_custo?: number; // V2: Preço de custo da semijoia (opcional/padrão 0 nos antigos)
   quantidade_estoque: number;
+  estoque_minimo?: number; // Limite mínimo de estoque para alerta visual e selo de atenção (padrão: 3)
   imagem_url?: string;
   created_at?: string;
 }

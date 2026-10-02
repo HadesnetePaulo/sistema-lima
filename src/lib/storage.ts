@@ -95,7 +95,68 @@ const STORAGE_KEY_AUTH = 'lima_semijoias_auth_v2';
 const STORAGE_KEY_CUSTOM_PASSWORD = 'lima_semijoias_custom_password_v1';
 const DEFAULT_PASSWORD = '123456';
 
+// Helper for server API calls
+async function callServerApi<T>(endpoint: string, options?: RequestInit): Promise<T | null> {
+  try {
+    const res = await fetch(endpoint, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(options?.headers || {})
+      }
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
 export const storage = {
+  // Cross-device Server Synchronization
+  async sincronizarServidor(): Promise<{
+    produtos: Produto[];
+    vendas: Venda[];
+    caixa: MovimentacaoCaixa[];
+    fiados: LancamentoFiado[];
+    masterPassword?: string;
+  } | null> {
+    const data = await callServerApi<{
+      success: boolean;
+      produtos: Produto[];
+      vendas: Venda[];
+      caixa: MovimentacaoCaixa[];
+      fiados: LancamentoFiado[];
+      masterPassword?: string;
+    }>('/api/sync');
+
+    if (data && data.success) {
+      if (Array.isArray(data.produtos) && data.produtos.length > 0) {
+        this.saveProdutos(data.produtos);
+      }
+      if (Array.isArray(data.vendas)) {
+        this.saveVendas(data.vendas);
+      }
+      if (Array.isArray(data.caixa)) {
+        this.saveMovimentacoesCaixa(data.caixa);
+      }
+      if (Array.isArray(data.fiados)) {
+        this.saveFiados(data.fiados);
+      }
+      if (data.masterPassword) {
+        safeLocalStorage.setItem(STORAGE_KEY_CUSTOM_PASSWORD, data.masterPassword);
+      }
+      return {
+        produtos: this.getProdutos(),
+        vendas: this.getVendas(),
+        caixa: this.getMovimentacoesCaixa(),
+        fiados: this.getFiados(),
+        masterPassword: data.masterPassword
+      };
+    }
+    return null;
+  },
+
   // Authentication & Password Protection
   getMasterPassword(): string {
     return safeLocalStorage.getItem(STORAGE_KEY_CUSTOM_PASSWORD) || DEFAULT_PASSWORD;
@@ -103,6 +164,10 @@ export const storage = {
 
   setMasterPassword(newPassword: string): void {
     safeLocalStorage.setItem(STORAGE_KEY_CUSTOM_PASSWORD, newPassword);
+    callServerApi('/api/auth/password', {
+      method: 'POST',
+      body: JSON.stringify({ password: newPassword })
+    }).catch(() => {});
   },
 
   /**
@@ -196,6 +261,13 @@ export const storage = {
     const produtos = this.getProdutos();
     produtos.unshift(novoProduto);
     this.saveProdutos(produtos);
+
+    // Persist to central server for multi-device sync
+    callServerApi('/api/produtos', {
+      method: 'POST',
+      body: JSON.stringify(novoProduto)
+    }).catch(() => {});
+
     return novoProduto;
   },
 
@@ -218,9 +290,17 @@ export const storage = {
       ...produtoData,
       preco: Number(produtoData.preco ?? produtos[index].preco),
       preco_custo: produtoData.preco_custo !== undefined ? Number(produtoData.preco_custo) : (produtos[index].preco_custo ?? 0),
-      quantidade_estoque: Number(produtoData.quantidade_estoque ?? produtos[index].quantidade_estoque)
+      quantidade_estoque: Number(produtoData.quantidade_estoque ?? produtos[index].quantidade_estoque),
+      estoque_minimo: produtoData.estoque_minimo !== undefined ? Number(produtoData.estoque_minimo) : (produtos[index].estoque_minimo ?? 3)
     };
     this.saveProdutos(produtos);
+
+    // Persist to central server for multi-device sync
+    callServerApi('/api/produtos', {
+      method: 'POST',
+      body: JSON.stringify(produtos[index])
+    }).catch(() => {});
+
     return produtos[index];
   },
 
@@ -236,6 +316,11 @@ export const storage = {
 
     const produtos = this.getProdutos().filter(p => p.id !== id);
     this.saveProdutos(produtos);
+
+    // Persist deletion to central server
+    callServerApi(`/api/produtos/${id}`, {
+      method: 'DELETE'
+    }).catch(() => {});
   },
 
   async ajustarEstoque(id: string, delta: number): Promise<Produto> {
@@ -260,6 +345,13 @@ export const storage = {
 
     produtos[index].quantidade_estoque = novoEstoque;
     this.saveProdutos(produtos);
+
+    // Persist quick adjustment to central server
+    callServerApi(`/api/produtos/${id}/estoque`, {
+      method: 'PATCH',
+      body: JSON.stringify({ delta })
+    }).catch(() => {});
+
     return produtos[index];
   },
 
@@ -377,6 +469,24 @@ export const storage = {
     vendas.unshift(novaVenda);
     this.saveVendas(vendas);
 
+    // Persist sale and stock deduction to central server for multi-device sync
+    callServerApi('/api/vendas', {
+      method: 'POST',
+      body: JSON.stringify({
+        itens: itens.map(i => ({
+          produto_id: i.produto.id,
+          nome_produto: i.produto.nome,
+          quantidade: i.quantidade,
+          preco_unitario: i.produto.preco,
+          preco_custo: i.produto.preco_custo || 0
+        })),
+        forma_pagamento: formaPagamento,
+        cliente_nome: clienteNome,
+        cliente_whatsapp: clienteWhatsapp,
+        total: novaVenda.total
+      })
+    }).catch(() => {});
+
     // V2: Se for compra Fiada, cria débito automático no controle de fiado local
     if (formaPagamento.toLowerCase().includes('fiado') && clienteNome?.trim()) {
       this.addLancamentoFiado({
@@ -440,6 +550,13 @@ export const storage = {
     const movs = this.getMovimentacoesCaixa();
     movs.unshift(novaMov);
     this.saveMovimentacoesCaixa(movs);
+
+    // Persist cash movement to central server
+    callServerApi('/api/caixa', {
+      method: 'POST',
+      body: JSON.stringify(novaMov)
+    }).catch(() => {});
+
     return novaMov;
   },
 
@@ -455,6 +572,11 @@ export const storage = {
 
     const movs = this.getMovimentacoesCaixa().filter(m => m.id !== id);
     this.saveMovimentacoesCaixa(movs);
+
+    // Persist deletion to central server
+    callServerApi(`/api/caixa/${id}`, {
+      method: 'DELETE'
+    }).catch(() => {});
   },
 
   // -------------------------------------------------------------
@@ -505,6 +627,13 @@ export const storage = {
     const fiados = this.getFiados();
     fiados.unshift(novoLancamento);
     this.saveFiados(fiados);
+
+    // Persist fiado to central server
+    callServerApi('/api/fiados', {
+      method: 'POST',
+      body: JSON.stringify(novoLancamento)
+    }).catch(() => {});
+
     return novoLancamento;
   },
 
@@ -520,6 +649,11 @@ export const storage = {
 
     const fiados = this.getFiados().filter(f => f.id !== id);
     this.saveFiados(fiados);
+
+    // Persist deletion to central server
+    callServerApi(`/api/fiados/${id}`, {
+      method: 'DELETE'
+    }).catch(() => {});
   },
 
   /**

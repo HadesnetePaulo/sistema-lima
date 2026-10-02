@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "Lima Semijoias — Vendas & Estoque",
+  "name": "Lima Semijoias — Vendas, Estoque & Caixa",
   "short_name": "Lima Semijoias",
-  "description": "Sistema simples de vendas, estoque e recibos para loja Lima Semijoias.",
+  "description": "Sistema completo de vendas, controle de estoque, fluxo de caixa e fiados da Lima Semijoias.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
