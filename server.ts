@@ -1,3 +1,5 @@
+process.env.DISABLE_HMR = 'true';
+
 import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
@@ -8,7 +10,16 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = 3000;
+
+// Parse port from CLI flags, env, or default 3000
+const args = process.argv.slice(2);
+let cliPort = 0;
+for (let i = 0; i < args.length; i++) {
+  if (args[i] === '--port' && args[i + 1]) {
+    cliPort = parseInt(args[i + 1], 10);
+  }
+}
+const PORT = cliPort || Number(process.env.PORT) || 3000;
 
 app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ extended: true, limit: '20mb' }));
@@ -445,16 +456,32 @@ async function startServer() {
   const isProduction = process.env.NODE_ENV === 'production';
 
   if (!isProduction) {
-    // In development, attach Vite middlewares
+    // In development, attach Vite middlewares with HMR disabled (as required in iframe environment)
     const vite = await createViteServer({
       server: {
         middlewareMode: true,
-        host: '0.0.0.0',
-        port: PORT,
+        hmr: false,
       },
       appType: 'spa',
     });
     app.use(vite.middlewares);
+
+    // SPA fallback for HTML in dev
+    app.use('*', async (req, res, next) => {
+      const url = req.originalUrl;
+      if (url.startsWith('/api')) {
+        return next();
+      }
+      try {
+        const indexPath = path.resolve(__dirname, 'index.html');
+        let template = fs.readFileSync(indexPath, 'utf-8');
+        template = await vite.transformIndexHtml(url, template);
+        res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
+      } catch (e: any) {
+        vite.ssrFixStacktrace(e);
+        next(e);
+      }
+    });
   } else {
     // In production, serve dist folder
     const distPath = path.resolve(__dirname, 'dist');
