@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Produto, CartItem, FormaPagamento, FORMAS_PAGAMENTO, CATEGORIAS, CategoriaProduto, Venda, ContaCliente } from '../types';
+import { Produto, CartItem, FormaPagamento, FORMAS_PAGAMENTO, CATEGORIAS, CategoriaProduto, Venda, ContaCliente, LancamentoFiado } from '../types';
 import { storage } from '../lib/storage';
 import { playBeepSuccess, playBeepError } from '../lib/audio';
 import { CameraBarcodeScanner } from './CameraBarcodeScanner';
@@ -29,12 +29,16 @@ import {
 
 interface NovaVendaProps {
   produtos: Produto[];
+  vendas?: Venda[];
+  fiados?: LancamentoFiado[];
   onVendaConcluida: (novaVenda: Venda) => void;
   onRefreshProdutos: () => void;
 }
 
 export const NovaVenda: React.FC<NovaVendaProps> = ({
   produtos,
+  vendas,
+  fiados,
   onVendaConcluida,
   onRefreshProdutos
 }) => {
@@ -55,10 +59,10 @@ export const NovaVenda: React.FC<NovaVendaProps> = ({
   const [buscaContaInput, setBuscaContaInput] = useState('');
   const [criandoNovaConta, setCriandoNovaConta] = useState(false);
 
-  // Update customer accounts on mount or sales change
+  // Update customer accounts on mount or real-time sales/fiados change
   useEffect(() => {
     setContasClientes(storage.getContasClientes());
-  }, [produtos]);
+  }, [produtos, vendas, fiados]);
 
   const contasFiltradas = useMemo(() => {
     const q = buscaContaInput.trim().toLowerCase();

@@ -143,8 +143,8 @@ export const storage = {
     const fiados = this.getFiados();
     const masterPassword = this.getMasterPassword();
 
-    // 1. Firebase Firestore (nuvem permanente definitiva)
-    saveStateToFirestore({ produtos, vendas, caixa, fiados }).catch(() => {});
+    // 1. Firebase Firestore (nuvem permanente definitiva em tempo real)
+    await saveStateToFirestore({ produtos, vendas, caixa, fiados });
 
     // 2. Servidor central (/api/sync)
     callServerApi('/api/sync', {
@@ -159,6 +159,26 @@ export const storage = {
     }).catch(() => {});
   },
 
+  /**
+   * Atualiza imediatamente o armazenamento local (localStorage) com o estado da nuvem.
+   * Isso garante que qualquer aparelho conectado reflita instantaneamente os dados.
+   */
+  atualizarEstadoLocal(cloudState: {
+    produtos?: Produto[];
+    vendas?: Venda[];
+    caixa?: MovimentacaoCaixa[];
+    fiados?: LancamentoFiado[];
+    masterPassword?: string;
+  }): void {
+    safeLocalStorage.setItem(STORAGE_KEY_PRODUTOS, JSON.stringify(cloudState.produtos || []));
+    safeLocalStorage.setItem(STORAGE_KEY_VENDAS, JSON.stringify(cloudState.vendas || []));
+    safeLocalStorage.setItem(STORAGE_KEY_CAIXA, JSON.stringify(cloudState.caixa || []));
+    safeLocalStorage.setItem(STORAGE_KEY_FIADOS, JSON.stringify(cloudState.fiados || []));
+    if (cloudState.masterPassword) {
+      safeLocalStorage.setItem(STORAGE_KEY_CUSTOM_PASSWORD, cloudState.masterPassword);
+    }
+  },
+
   async sincronizarServidor(): Promise<{
     produtos: Produto[];
     vendas: Venda[];
@@ -167,43 +187,39 @@ export const storage = {
     masterPassword?: string;
     fromFirebase?: boolean;
   } | null> {
-    const localProdutos = this.getProdutos();
-    const localVendas = this.getVendas();
-    const localCaixa = this.getMovimentacoesCaixa();
-    const localFiados = this.getFiados();
-
-    // 1. Prioridade máxima: Firebase Firestore na nuvem com Smart Merge
+    // 1. Prioridade máxima: Firebase Firestore na nuvem (fonte da verdade)
     try {
       const firestoreData = await fetchStateFromFirestore();
       if (firestoreData) {
-        // Nuvem Firebase Firestore é a fonte única centralizada da loja
-        const produtosUnificados = firestoreData.produtos || [];
-        const vendasUnificadas = firestoreData.vendas || [];
-        const caixaUnificado = firestoreData.caixa || [];
-        const fiadosUnificados = firestoreData.fiados || [];
+        const produtos = firestoreData.produtos || [];
+        const vendas = firestoreData.vendas || [];
+        const caixa = firestoreData.caixa || [];
+        const fiados = firestoreData.fiados || [];
 
-        safeLocalStorage.setItem(STORAGE_KEY_PRODUTOS, JSON.stringify(produtosUnificados));
-        safeLocalStorage.setItem(STORAGE_KEY_VENDAS, JSON.stringify(vendasUnificadas));
-        safeLocalStorage.setItem(STORAGE_KEY_CAIXA, JSON.stringify(caixaUnificado));
-        safeLocalStorage.setItem(STORAGE_KEY_FIADOS, JSON.stringify(fiadosUnificados));
+        this.atualizarEstadoLocal({
+          produtos,
+          vendas,
+          caixa,
+          fiados
+        });
 
-        // Replica a união para o servidor Express local
+        // Replica para servidor local se necessário
         callServerApi('/api/sync', {
           method: 'POST',
           body: JSON.stringify({
-            produtos: produtosUnificados,
-            vendas: vendasUnificadas,
-            caixa: caixaUnificado,
-            fiados: fiadosUnificados,
+            produtos,
+            vendas,
+            caixa,
+            fiados,
             masterPassword: this.getMasterPassword()
           })
         }).catch(() => {});
 
         return {
-          produtos: produtosUnificados,
-          vendas: vendasUnificadas,
-          caixa: caixaUnificado,
-          fiados: fiadosUnificados,
+          produtos,
+          vendas,
+          caixa,
+          fiados,
           masterPassword: this.getMasterPassword(),
           fromFirebase: true
         };
@@ -212,7 +228,7 @@ export const storage = {
       console.warn('[Firebase] Fallback para servidor local:', err);
     }
 
-    // 2. Se Firebase estiver vazio ainda ou offline, busca no servidor Express local com Smart Merge
+    // 2. Se Firebase estiver temporariamente inacessível, busca no servidor Express
     const data = await callServerApi<{
       success: boolean;
       produtos: Produto[];
@@ -223,33 +239,24 @@ export const storage = {
     }>('/api/sync');
 
     if (data && data.success) {
-      const produtosUnificados = mergeArraysById(localProdutos, data.produtos || []);
-      const vendasUnificadas = mergeArraysById(localVendas, data.vendas || []);
-      const caixaUnificado = mergeArraysById(localCaixa, data.caixa || []);
-      const fiadosUnificados = mergeArraysById(localFiados, data.fiados || []);
+      const produtos = data.produtos || [];
+      const vendas = data.vendas || [];
+      const caixa = data.caixa || [];
+      const fiados = data.fiados || [];
 
-      safeLocalStorage.setItem(STORAGE_KEY_PRODUTOS, JSON.stringify(produtosUnificados));
-      safeLocalStorage.setItem(STORAGE_KEY_VENDAS, JSON.stringify(vendasUnificadas));
-      safeLocalStorage.setItem(STORAGE_KEY_CAIXA, JSON.stringify(caixaUnificado));
-      safeLocalStorage.setItem(STORAGE_KEY_FIADOS, JSON.stringify(fiadosUnificados));
-
-      if (data.masterPassword) {
-        safeLocalStorage.setItem(STORAGE_KEY_CUSTOM_PASSWORD, data.masterPassword);
-      }
-
-      // Popula o Firebase com a união dos dados
-      saveStateToFirestore({
-        produtos: produtosUnificados,
-        vendas: vendasUnificadas,
-        caixa: caixaUnificado,
-        fiados: fiadosUnificados
-      }).catch(() => {});
+      this.atualizarEstadoLocal({
+        produtos,
+        vendas,
+        caixa,
+        fiados,
+        masterPassword: data.masterPassword
+      });
 
       return {
-        produtos: produtosUnificados,
-        vendas: vendasUnificadas,
-        caixa: caixaUnificado,
-        fiados: fiadosUnificados,
+        produtos,
+        vendas,
+        caixa,
+        fiados,
         masterPassword: data.masterPassword,
         fromFirebase: false
       };

@@ -107,6 +107,9 @@ export default function App() {
 
     // Real-time multi-device subscription: when ANY phone or PC saves, updates reflect here immediately!
     const unsubscribeFirestore = subscribeToFirestoreState((cloudState) => {
+      // 1. Immediately update localStorage so that storage.getProdutos(), storage.getVendas(), etc., reflect the cloud
+      storage.atualizarEstadoLocal(cloudState);
+      // 2. Immediately update React state on all connected devices
       setProdutos(cloudState.produtos);
       setVendas(cloudState.vendas);
       setMovimentacoesCaixa(cloudState.caixa);
@@ -193,6 +196,8 @@ export default function App() {
         {activeTab === 'pdv' && (
           <NovaVenda
             produtos={produtos}
+            vendas={vendas}
+            fiados={fiados}
             onVendaConcluida={handleVendaConcluida}
             onRefreshProdutos={carregarDados}
           />
@@ -215,6 +220,8 @@ export default function App() {
 
         {activeTab === 'fiado' && (
           <ControleFiado
+            fiados={fiados}
+            vendas={vendas}
             onRefresh={carregarDados}
           />
         )}

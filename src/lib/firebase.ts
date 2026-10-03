@@ -81,15 +81,15 @@ export async function saveStateToFirestore(state: {
     const docRef = doc(db, 'sistema', 'dados_principais');
     const payload: FirestoreSystemState = {
       lastUpdated: new Date().toISOString(),
-      produtos: state.produtos,
-      vendas: state.vendas,
-      caixa: state.caixa,
-      fiados: state.fiados,
+      produtos: state.produtos || [],
+      vendas: state.vendas || [],
+      caixa: state.caixa || [],
+      fiados: state.fiados || [],
     };
-    await setDoc(docRef, payload, { merge: true });
+    await setDoc(docRef, payload);
     return true;
   } catch (err) {
-    console.warn('[Firestore] Aviso ao salvar dados na nuvem:', err);
+    console.warn('[Firestore] Erro ao salvar dados na nuvem:', err);
     return false;
   }
 }

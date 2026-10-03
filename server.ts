@@ -187,7 +187,7 @@ app.post('/api/sync', (req, res) => {
     const { produtos, vendas, caixa, fiados, masterPassword } = req.body;
     let changed = false;
 
-    if (Array.isArray(produtos) && produtos.length > 0) {
+    if (Array.isArray(produtos)) {
       currentStore.produtos = produtos;
       changed = true;
     }

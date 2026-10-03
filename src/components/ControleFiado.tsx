@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { LancamentoFiado, ResumoClienteFiado } from '../types';
+import { LancamentoFiado, ResumoClienteFiado, Venda } from '../types';
 import { storage } from '../lib/storage';
 import { 
   Users, 
@@ -19,10 +19,12 @@ import {
 } from 'lucide-react';
 
 interface ControleFiadoProps {
+  fiados?: LancamentoFiado[];
+  vendas?: Venda[];
   onRefresh: () => void;
 }
 
-export const ControleFiado: React.FC<ControleFiadoProps> = ({ onRefresh }) => {
+export const ControleFiado: React.FC<ControleFiadoProps> = ({ fiados, vendas, onRefresh }) => {
   const [busca, setBusca] = useState('');
   const [clienteSelecionado, setClienteSelecionado] = useState<ResumoClienteFiado | null>(null);
 
@@ -62,7 +64,7 @@ export const ControleFiado: React.FC<ControleFiadoProps> = ({ onRefresh }) => {
   // Get calculated summaries from storage
   const resumos = useMemo(() => {
     return storage.getResumoFiados();
-  }, [storage.getFiados()]);
+  }, [fiados, vendas]);
 
   // Overall metrics
   const totalPendente = useMemo(() => {
