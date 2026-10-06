@@ -169,14 +169,14 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Zone 3: Primary Actions (Cloud status pill + PWA Install + Logout/Lock) */}
         <div className="flex items-center gap-2">
-          {/* Cloud Firebase Indicator */}
+          {/* Cloud Firebase Indicator - Always visible with pulse status */}
           <button
             onClick={() => setActiveTab('config')}
-            title="Dados protegidos e sincronizados na nuvem Firebase"
-            className="hidden sm:inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full border border-emerald-500/40 bg-emerald-950/60 text-emerald-300 font-medium hover:bg-emerald-900/60 transition cursor-pointer"
+            title="Dados protegidos e sincronizados na nuvem Firebase Firestore"
+            className="inline-flex items-center gap-1.5 text-[11px] sm:text-xs px-2.5 py-1 sm:py-1.5 rounded-full border border-emerald-500/40 bg-emerald-950/70 text-emerald-300 font-medium hover:bg-emerald-900/60 transition cursor-pointer shrink-0"
           >
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>Nuvem Firebase Ativa</span>
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+            <span><span className="hidden xs:inline">Nuvem </span>Firebase</span>
           </button>
 
           {/* Supabase optional indicator */}
@@ -201,6 +201,105 @@ export const Header: React.FC<HeaderProps> = ({
             <LogOut className="w-4 h-4" />
           </button>
         </div>
+      </div>
+
+      {/* Mobile Sub-Navigation Strip (Direct One-Tap Access to ALL Modules on Phones) */}
+      <div className="lg:hidden bg-stone-900/95 border-b border-stone-800 px-3 py-1.5 overflow-x-auto no-scrollbar flex items-center gap-1.5 scroll-smooth shadow-inner">
+        <button
+          onClick={() => handleSelectTab('pdv')}
+          className={`px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap flex items-center gap-1.5 transition shrink-0 ${
+            activeTab === 'pdv'
+              ? 'bg-amber-500 text-stone-950 font-bold shadow-xs'
+              : 'text-stone-300 bg-stone-800/80 hover:bg-stone-700'
+          }`}
+        >
+          <ShoppingBag className="w-3.5 h-3.5" />
+          <span>Vender</span>
+        </button>
+
+        <button
+          onClick={() => handleSelectTab('produtos')}
+          className={`px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap flex items-center gap-1.5 transition shrink-0 ${
+            activeTab === 'produtos'
+              ? 'bg-amber-500 text-stone-950 font-bold shadow-xs'
+              : 'text-stone-300 bg-stone-800/80 hover:bg-stone-700'
+          }`}
+        >
+          <Package className="w-3.5 h-3.5" />
+          <span>Estoque</span>
+        </button>
+
+        <button
+          onClick={() => handleSelectTab('fornecedores')}
+          className={`px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap flex items-center gap-1.5 transition shrink-0 ${
+            activeTab === 'fornecedores'
+              ? 'bg-amber-500 text-stone-950 font-bold shadow-xs'
+              : 'text-amber-300 bg-amber-500/20 border border-amber-500/40 hover:bg-amber-500/30'
+          }`}
+        >
+          <Truck className="w-3.5 h-3.5 text-amber-400" />
+          <span className="font-bold">🚚 Fornecedores</span>
+        </button>
+
+        <button
+          onClick={() => handleSelectTab('caixa')}
+          className={`px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap flex items-center gap-1.5 transition shrink-0 ${
+            activeTab === 'caixa'
+              ? 'bg-amber-500 text-stone-950 font-bold shadow-xs'
+              : 'text-stone-300 bg-stone-800/80 hover:bg-stone-700'
+          }`}
+        >
+          <Wallet className="w-3.5 h-3.5 text-emerald-400" />
+          <span>Caixa</span>
+        </button>
+
+        <button
+          onClick={() => handleSelectTab('fiado')}
+          className={`px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap flex items-center gap-1.5 transition shrink-0 ${
+            activeTab === 'fiado'
+              ? 'bg-amber-500 text-stone-950 font-bold shadow-xs'
+              : 'text-stone-300 bg-stone-800/80 hover:bg-stone-700'
+          }`}
+        >
+          <Users className="w-3.5 h-3.5 text-amber-400" />
+          <span>Fiados</span>
+        </button>
+
+        <button
+          onClick={() => handleSelectTab('relatorios')}
+          className={`px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap flex items-center gap-1.5 transition shrink-0 ${
+            activeTab === 'relatorios'
+              ? 'bg-amber-500 text-stone-950 font-bold shadow-xs'
+              : 'text-stone-300 bg-stone-800/80 hover:bg-stone-700'
+          }`}
+        >
+          <BarChart3 className="w-3.5 h-3.5 text-sky-400" />
+          <span>Relatórios</span>
+        </button>
+
+        <button
+          onClick={() => handleSelectTab('vendas')}
+          className={`px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap flex items-center gap-1.5 transition shrink-0 ${
+            activeTab === 'vendas'
+              ? 'bg-amber-500 text-stone-950 font-bold shadow-xs'
+              : 'text-stone-300 bg-stone-800/80 hover:bg-stone-700'
+          }`}
+        >
+          <ReceiptText className="w-3.5 h-3.5 text-amber-400" />
+          <span>Vendas</span>
+        </button>
+
+        <button
+          onClick={() => handleSelectTab('config')}
+          className={`px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap flex items-center gap-1.5 transition shrink-0 ${
+            activeTab === 'config'
+              ? 'bg-amber-500 text-stone-950 font-bold shadow-xs'
+              : 'text-stone-300 bg-stone-800/80 hover:bg-stone-700'
+          }`}
+        >
+          <Database className="w-3.5 h-3.5 text-emerald-400" />
+          <span>Backup/Nuvem</span>
+        </button>
       </div>
 
       {/* Mobile Bottom Navigation Anchor - Spacious, touch-friendly, safe-area aware */}
@@ -239,6 +338,19 @@ export const Header: React.FC<HeaderProps> = ({
         </button>
 
         <button
+          onClick={() => handleSelectTab('fornecedores')}
+          className={`flex-1 h-full flex flex-col items-center justify-center transition-all cursor-pointer select-none active:scale-95 ${
+            activeTab === 'fornecedores' ? 'text-amber-400 font-bold' : 'text-amber-400/80 hover:text-amber-300'
+          }`}
+        >
+          <Truck className={`w-5 h-5 transition-transform ${activeTab === 'fornecedores' ? 'scale-110 text-amber-400' : ''}`} />
+          <span className="mt-1 text-[11px] tracking-tight font-medium">Fornecedor</span>
+          {activeTab === 'fornecedores' && (
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-0.5" />
+          )}
+        </button>
+
+        <button
           onClick={() => handleSelectTab('caixa')}
           className={`flex-1 h-full flex flex-col items-center justify-center transition-all cursor-pointer select-none active:scale-95 ${
             activeTab === 'caixa' ? 'text-amber-400 font-bold' : 'text-stone-400 hover:text-stone-300'
@@ -252,27 +364,14 @@ export const Header: React.FC<HeaderProps> = ({
         </button>
 
         <button
-          onClick={() => handleSelectTab('fiado')}
-          className={`flex-1 h-full flex flex-col items-center justify-center transition-all cursor-pointer select-none active:scale-95 ${
-            activeTab === 'fiado' ? 'text-amber-400 font-bold' : 'text-stone-400 hover:text-stone-300'
-          }`}
-        >
-          <Users className={`w-5 h-5 transition-transform ${activeTab === 'fiado' ? 'scale-110 text-amber-400' : ''}`} />
-          <span className="mt-1 text-[11px] tracking-tight">C. Corrente</span>
-          {activeTab === 'fiado' && (
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-0.5" />
-          )}
-        </button>
-
-        <button
           onClick={() => setMobileMenuAberto(true)}
           className={`flex-1 h-full flex flex-col items-center justify-center transition-all cursor-pointer select-none active:scale-95 ${
-            ['vendas', 'relatorios', 'config', 'fornecedores'].includes(activeTab) ? 'text-amber-400 font-bold' : 'text-stone-400 hover:text-stone-300'
+            ['vendas', 'relatorios', 'config', 'fiado'].includes(activeTab) ? 'text-amber-400 font-bold' : 'text-stone-400 hover:text-stone-300'
           }`}
         >
-          <MoreHorizontal className={`w-5 h-5 transition-transform ${['vendas', 'relatorios', 'config', 'fornecedores'].includes(activeTab) ? 'scale-110 text-amber-400' : ''}`} />
+          <MoreHorizontal className={`w-5 h-5 transition-transform ${['vendas', 'relatorios', 'config', 'fiado'].includes(activeTab) ? 'scale-110 text-amber-400' : ''}`} />
           <span className="mt-1 text-[11px] tracking-tight">Mais</span>
-          {['vendas', 'relatorios', 'config', 'fornecedores'].includes(activeTab) && (
+          {['vendas', 'relatorios', 'config', 'fiado'].includes(activeTab) && (
             <span className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-0.5" />
           )}
         </button>

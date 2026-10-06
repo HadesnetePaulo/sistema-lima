@@ -118,12 +118,20 @@ export default function App() {
       // 1. Immediately update localStorage so that storage.getProdutos(), storage.getVendas(), etc., reflect the cloud
       storage.atualizarEstadoLocal(cloudState);
       // 2. Immediately update React state on all connected devices
-      if (cloudState.produtos) setProdutos(cloudState.produtos);
+      if (cloudState.produtos && cloudState.produtos.length > 0) setProdutos(cloudState.produtos);
       if (cloudState.vendas) setVendas(cloudState.vendas);
       if (cloudState.caixa) setMovimentacoesCaixa(cloudState.caixa);
       if (cloudState.fiados) setFiados(cloudState.fiados);
-      if (cloudState.fornecedores) setFornecedores(cloudState.fornecedores);
-      if (cloudState.pedidosCompra) setPedidosCompra(cloudState.pedidosCompra);
+      if (cloudState.fornecedores && cloudState.fornecedores.length > 0) {
+        setFornecedores(cloudState.fornecedores);
+      } else {
+        setFornecedores(storage.getFornecedores());
+      }
+      if (cloudState.pedidosCompra && cloudState.pedidosCompra.length > 0) {
+        setPedidosCompra(cloudState.pedidosCompra);
+      } else {
+        setPedidosCompra(storage.getPedidosCompra());
+      }
     });
 
     // Background polling every 4s for real-time multi-device sync fallback
@@ -217,6 +225,7 @@ export default function App() {
           <ProdutosEstoque
             produtos={produtos}
             onRefresh={carregarDados}
+            onNavigateToFornecedores={() => setActiveTab('fornecedores')}
           />
         )}
 

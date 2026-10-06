@@ -104,6 +104,83 @@ export const PRODUTOS_INICIAIS: Produto[] = [
   }
 ];
 
+export const FORNECEDORES_INICIAIS: Fornecedor[] = [
+  {
+    id: 'forn-001',
+    nome: 'Galvanoplastia & Brutos Joias Finas',
+    razaoSocial: 'Brutos & Banho Limeira Semijoias Eireli',
+    cnpjOuCpf: '12.345.678/0001-90',
+    telefone: '(19) 3451-2200',
+    whatsapp: '19998877665',
+    email: 'comercial@brutoslimeira.com.br',
+    prazoMedioEntregaDias: 7,
+    pedidoMinimo: 300,
+    formasPagamento: ['PIX com 5% desc', 'Boleto 15/30dd'],
+    observacoes: 'Fornecedor principal de banho de ouro 18k 10 milésimos e verniz cataforético.',
+    created_at: new Date('2026-09-01T08:00:00Z').toISOString(),
+  },
+  {
+    id: 'forn-002',
+    nome: 'Zircônias & Cristais Brasil',
+    razaoSocial: 'Lapidação & Pedras Nobres Comércio Ltda',
+    cnpjOuCpf: '23.456.789/0001-01',
+    telefone: '(11) 3222-1100',
+    whatsapp: '11987654321',
+    email: 'pedidos@cristaisbrasil.com.br',
+    prazoMedioEntregaDias: 5,
+    pedidoMinimo: 200,
+    formasPagamento: ['PIX', 'Cartão 3x'],
+    observacoes: 'Cravação em micro pavê, zircônias 5A e cristais premium para brincos e solitários.',
+    created_at: new Date('2026-09-05T09:00:00Z').toISOString(),
+  },
+  {
+    id: 'forn-003',
+    nome: 'Embalagens & Estojos Veludo Luxo',
+    razaoSocial: 'Estojos & Sacolas Premium Eireli',
+    cnpjOuCpf: '34.567.890/0001-12',
+    telefone: '(31) 3333-4455',
+    whatsapp: '31971234567',
+    email: 'contato@veludoluxo.com.br',
+    prazoMedioEntregaDias: 10,
+    pedidoMinimo: 150,
+    formasPagamento: ['PIX', 'Boleto 30dd'],
+    observacoes: 'Caixinhas aveludadas, sacolas personalizadas e tags com certificado de garantia 1 ano.',
+    created_at: new Date('2026-09-10T10:00:00Z').toISOString(),
+  }
+];
+
+export const PEDIDOS_COMPRA_INICIAIS: PedidoCompra[] = [
+  {
+    id: 'ped-001',
+    fornecedorId: 'forn-001',
+    fornecedorNome: 'Galvanoplastia & Brutos Joias Finas',
+    dataPedido: new Date('2026-09-20T10:00:00Z').toISOString(),
+    dataPrevistaEntrega: new Date('2026-09-27T18:00:00Z').toISOString(),
+    dataRecebimento: new Date('2026-09-26T14:30:00Z').toISOString(),
+    status: 'recebido',
+    itens: [
+      {
+        produtoId: 'prod-001',
+        nomeProduto: 'Anel Solitário Cravejado Ouro 18k',
+        quantidade: 10,
+        custoUnitario: 52.00,
+        subtotal: 520.00
+      },
+      {
+        produtoId: 'prod-002',
+        nomeProduto: 'Colar Gargantilha Pérola Barroca Ouro 18k',
+        quantidade: 5,
+        custoUnitario: 68.00,
+        subtotal: 340.00
+      }
+    ],
+    valorTotal: 860.00,
+    recebidoPor: 'Gerência Lima',
+    observacoes: 'Lote recebido com alta qualidade de banho.',
+    created_at: new Date('2026-09-20T10:00:00Z').toISOString(),
+  }
+];
+
 const STORAGE_KEY_PRODUTOS = 'lima_semijoias_produtos_v1';
 const STORAGE_KEY_VENDAS = 'lima_semijoias_vendas_v1';
 const STORAGE_KEY_CAIXA = 'lima_semijoias_caixa_v2';
@@ -231,8 +308,24 @@ export const storage = {
         const vendas = firestoreData.vendas || [];
         const caixa = firestoreData.caixa || [];
         const fiados = firestoreData.fiados || [];
-        const fornecedores = firestoreData.fornecedores || [];
-        const pedidosCompra = firestoreData.pedidosCompra || [];
+        const fornecedores = (firestoreData.fornecedores && firestoreData.fornecedores.length > 0)
+          ? firestoreData.fornecedores
+          : FORNECEDORES_INICIAIS;
+        const pedidosCompra = (firestoreData.pedidosCompra && firestoreData.pedidosCompra.length > 0)
+          ? firestoreData.pedidosCompra
+          : PEDIDOS_COMPRA_INICIAIS;
+
+        // Se Firestore ainda não tinha fornecedores salvos, sincroniza de volta para a nuvem
+        if (!firestoreData.fornecedores || firestoreData.fornecedores.length === 0) {
+          saveStateToFirestore({
+            produtos,
+            vendas,
+            caixa,
+            fiados,
+            fornecedores,
+            pedidosCompra
+          }).catch(() => {});
+        }
 
         this.atualizarEstadoLocal({
           produtos,
@@ -1099,9 +1192,13 @@ export const storage = {
   getFornecedores(): Fornecedor[] {
     try {
       const data = safeLocalStorage.getItem(STORAGE_KEY_FORNECEDORES);
-      return data ? JSON.parse(data) : [];
+      if (data) {
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+      return FORNECEDORES_INICIAIS;
     } catch {
-      return [];
+      return FORNECEDORES_INICIAIS;
     }
   },
 
@@ -1238,9 +1335,13 @@ export const storage = {
   getPedidosCompra(): PedidoCompra[] {
     try {
       const data = safeLocalStorage.getItem(STORAGE_KEY_PEDIDOS_COMPRA);
-      return data ? JSON.parse(data) : [];
+      if (data) {
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+      return PEDIDOS_COMPRA_INICIAIS;
     } catch {
-      return [];
+      return PEDIDOS_COMPRA_INICIAIS;
     }
   },
 

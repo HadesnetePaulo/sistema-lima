@@ -96,9 +96,14 @@ async function compressImageFile(file: File, maxDimension = 900, quality = 0.85)
 interface ProdutosEstoqueProps {
   produtos: Produto[];
   onRefresh: () => void;
+  onNavigateToFornecedores?: () => void;
 }
 
-export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRefresh }) => {
+export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ 
+  produtos, 
+  onRefresh,
+  onNavigateToFornecedores 
+}) => {
   const [busca, setBusca] = useState('');
   const [categoriaFiltro, setCategoriaFiltro] = useState<CategoriaProduto>('Todas');
   const [filtroStatus, setFiltroStatus] = useState<'todos' | 'baixo' | 'zerado'>('todos');
@@ -488,13 +493,25 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
           </p>
         </div>
 
-        <button
-          onClick={handleNovoProduto}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-stone-900 hover:bg-amber-600 text-white font-semibold text-xs shadow-md transition cursor-pointer active:scale-98 whitespace-nowrap min-h-[42px]"
-        >
-          <Plus className="w-4 h-4 text-amber-400" />
-          <span>Cadastrar Novo Produto</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {onNavigateToFornecedores && (
+            <button
+              onClick={onNavigateToFornecedores}
+              className="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-amber-50 hover:bg-amber-100/80 text-amber-900 border border-amber-300 font-semibold text-xs transition cursor-pointer active:scale-98 whitespace-nowrap min-h-[42px]"
+            >
+              <Truck className="w-4 h-4 text-amber-600" />
+              <span>Fornecedores & Pedidos</span>
+            </button>
+          )}
+
+          <button
+            onClick={handleNovoProduto}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-stone-900 hover:bg-amber-600 text-white font-semibold text-xs shadow-md transition cursor-pointer active:scale-98 whitespace-nowrap min-h-[42px]"
+          >
+            <Plus className="w-4 h-4 text-amber-400" />
+            <span>Cadastrar Novo Produto</span>
+          </button>
+        </div>
       </div>
 
       {/* Desktop Inventory Summary KPI Cards */}
