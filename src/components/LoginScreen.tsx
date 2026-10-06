@@ -51,12 +51,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onSuccess }) => {
       <div className="w-full max-w-sm sm:max-w-md relative z-10">
         {/* Brand Lockup */}
         <div className="text-center mb-6 sm:mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-700 p-0.5 shadow-2xl shadow-amber-950/60 mb-3.5">
-            <div className="w-full h-full bg-[#1C1917] rounded-[14px] overflow-hidden flex items-center justify-center p-1">
+          <div className="inline-flex items-center justify-center w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-gradient-to-br from-amber-300 via-amber-500 to-amber-700 p-0.5 shadow-2xl shadow-amber-950/60 mb-3.5">
+            <div className="w-full h-full bg-white rounded-[14px] overflow-hidden flex items-center justify-center p-1.5 shadow-inner">
               <img
                 src="/logo-lima.jpg"
                 alt="Lima Semijoias"
-                className="w-full h-full object-cover rounded-[10px]"
+                className="w-full h-full object-contain"
               />
             </div>
           </div>

@@ -1,5 +1,12 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { Produto, CATEGORIAS, CategoriaProduto } from '../types';
+import { 
+  Produto, 
+  CATEGORIAS, 
+  CategoriaProduto, 
+  Fornecedor, 
+  FornecedorProdutoRef, 
+  HistoricoPrecoFornecedor 
+} from '../types';
 import { storage } from '../lib/storage';
 import { buscarEspecificacoesPorCodigo } from '../lib/barcodeLookup';
 import { 
@@ -19,7 +26,12 @@ import {
   Wand2,
   Zap,
   Image as ImageIcon,
-  Upload
+  Upload,
+  Truck,
+  History,
+  Building2,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { CameraBarcodeScanner } from './CameraBarcodeScanner';
 
@@ -140,6 +152,13 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
     fonte?: string;
   } | null>(null);
 
+  // V3: Fornecedores vinculados ao produto
+  const [formFornecedores, setFormFornecedores] = useState<FornecedorProdutoRef[]>([]);
+  const [fornecedoresCadastrados, setFornecedoresCadastrados] = useState<Fornecedor[]>([]);
+  const [novoFornId, setNovoFornId] = useState('');
+  const [novoFornCusto, setNovoFornCusto] = useState('');
+  const [historicoAbertoFornId, setHistoricoAbertoFornId] = useState<string | null>(null);
+
   // Confirm delete
   const [deletandoId, setDeletandoId] = useState<string | null>(null);
 
@@ -218,6 +237,11 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
     setFormImagem('');
     setFormErro(null);
     setSpecsInfo(null);
+    setFormFornecedores([]);
+    setFornecedoresCadastrados(storage.getFornecedores());
+    setNovoFornId('');
+    setNovoFornCusto('');
+    setHistoricoAbertoFornId(null);
     setModalAberto(true);
   };
 
@@ -234,7 +258,97 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
     setFormImagem(prod.imagem_url || '');
     setFormErro(null);
     setSpecsInfo(null);
+    setFormFornecedores(Array.isArray(prod.fornecedores) ? JSON.parse(JSON.stringify(prod.fornecedores)) : []);
+    setFornecedoresCadastrados(storage.getFornecedores());
+    setNovoFornId('');
+    setNovoFornCusto('');
+    setHistoricoAbertoFornId(null);
     setModalAberto(true);
+  };
+
+  // Vincula ou atualiza fornecedor na lista temporária do formulário
+  const handleVincularFornecedorForm = () => {
+    if (!novoFornId) {
+      setFormErro('Selecione um fornecedor para vincular.');
+      return;
+    }
+    const custo = parseFloat(novoFornCusto.replace(',', '.'));
+    if (isNaN(custo) || custo < 0) {
+      setFormErro('Digite um preço de custo válido para o fornecedor.');
+      return;
+    }
+
+    const dataHoraIso = new Date().toISOString();
+    setFormFornecedores(prev => {
+      const idx = prev.findIndex(item => item.fornecedorId === novoFornId);
+      if (idx >= 0) {
+        const atual = prev[idx];
+        if (Number(atual.precoCusto) !== custo) {
+          const historico = Array.isArray(atual.historicoPrecos) ? [...atual.historicoPrecos] : [];
+          historico.unshift({
+            precoCusto: Number(atual.precoCusto),
+            dataAtualizacaoPreco: atual.dataAtualizacaoPreco || dataHoraIso
+          });
+          const copy = [...prev];
+          copy[idx] = {
+            ...atual,
+            precoCusto: custo,
+            dataAtualizacaoPreco: dataHoraIso,
+            historicoPrecos: historico
+          };
+          return copy;
+        }
+        return prev;
+      }
+      return [
+        ...prev,
+        {
+          fornecedorId: novoFornId,
+          precoCusto: custo,
+          dataAtualizacaoPreco: dataHoraIso,
+          historicoPrecos: []
+        }
+      ];
+    });
+
+    if (!formPrecoCusto || parseFloat(formPrecoCusto.replace(',', '.')) === 0) {
+      setFormPrecoCusto(novoFornCusto);
+    }
+
+    setNovoFornId('');
+    setNovoFornCusto('');
+    setFormErro(null);
+  };
+
+  const handleAlterarCustoFornecedorExistente = (fornecedorId: string, novoCustoStr: string) => {
+    const custo = parseFloat(novoCustoStr.replace(',', '.'));
+    if (isNaN(custo) || custo < 0) return;
+
+    const dataHoraIso = new Date().toISOString();
+    setFormFornecedores(prev => {
+      return prev.map(item => {
+        if (item.fornecedorId === fornecedorId) {
+          if (Number(item.precoCusto) !== custo) {
+            const historico = Array.isArray(item.historicoPrecos) ? [...item.historicoPrecos] : [];
+            historico.unshift({
+              precoCusto: Number(item.precoCusto),
+              dataAtualizacaoPreco: item.dataAtualizacaoPreco || dataHoraIso
+            });
+            return {
+              ...item,
+              precoCusto: custo,
+              dataAtualizacaoPreco: dataHoraIso,
+              historicoPrecos: historico
+            };
+          }
+        }
+        return item;
+      });
+    });
+  };
+
+  const handleRemoverFornecedorForm = (fornecedorId: string) => {
+    setFormFornecedores(prev => prev.filter(item => item.fornecedorId !== fornecedorId));
   };
 
   // Busca e puxa as especificações a partir do código de barras
@@ -327,7 +441,8 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
           preco_custo: precoCustoNum,
           quantidade_estoque: estoqueNum,
           estoque_minimo: finalEstoqueMinimo,
-          imagem_url: formImagem.trim() || undefined
+          imagem_url: formImagem.trim() || undefined,
+          fornecedores: formFornecedores
         });
       } else {
         await storage.addProduto({
@@ -338,7 +453,8 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
           preco_custo: precoCustoNum,
           quantidade_estoque: estoqueNum,
           estoque_minimo: finalEstoqueMinimo,
-          imagem_url: formImagem.trim() || undefined
+          imagem_url: formImagem.trim() || undefined,
+          fornecedores: formFornecedores
         });
       }
 
@@ -628,6 +744,13 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
                           </span>
                         ) : null}
                       </div>
+
+                      {Array.isArray(prod.fornecedores) && prod.fornecedores.length > 0 && (
+                        <div className="flex items-center gap-1 text-[10px] text-amber-900 font-semibold bg-amber-50 px-2 py-0.5 rounded border border-amber-200 mt-1 w-fit">
+                          <Truck className="w-3 h-3 text-amber-700" />
+                          <span>{prod.fornecedores.length} fornecedor{prod.fornecedores.length === 1 ? '' : 'es'}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -714,6 +837,7 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
                 <th className="py-3 px-4">Cód. Barras / Ref</th>
                 <th className="py-3 px-4">Preço Venda</th>
                 <th className="py-3 px-4">Preço Custo</th>
+                <th className="py-3 px-4">Fornecedores</th>
                 <th className="py-3 px-4">Margem Bruta</th>
                 <th className="py-3 px-4 text-center">Estoque Atual</th>
                 <th className="py-3 px-4 text-right">Ações</th>
@@ -819,6 +943,37 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
                           <span className="text-[11px] text-stone-400 italic">
                             Não informado
                           </span>
+                        )}
+                      </td>
+
+                      {/* Fornecedores vinculados */}
+                      <td className="py-3 px-4">
+                        {Array.isArray(prod.fornecedores) && prod.fornecedores.length > 0 ? (
+                          <div className="flex flex-col gap-0.5">
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-900 bg-amber-100/80 px-2 py-0.5 rounded-md border border-amber-300 w-fit">
+                              <Truck className="w-3 h-3 text-amber-700" />
+                              <span>{prod.fornecedores.length} fornecedor{prod.fornecedores.length === 1 ? '' : 'es'}</span>
+                            </span>
+                            {prod.fornecedores.slice(0, 2).map(vinculo => {
+                              const forn = fornecedoresCadastrados.find(f => f.id === vinculo.fornecedorId);
+                              return (
+                                <span 
+                                  key={vinculo.fornecedorId} 
+                                  className="text-[10px] text-stone-600 truncate max-w-[130px]" 
+                                  title={`${forn?.nome || 'Fornecedor'}: ${formatCurrency(vinculo.precoCusto)}`}
+                                >
+                                  {forn?.nome || 'Fornecedor'}: {formatCurrency(vinculo.precoCusto)}
+                                </span>
+                              );
+                            })}
+                            {prod.fornecedores.length > 2 && (
+                              <span className="text-[9px] text-stone-400 italic">
+                                +{prod.fornecedores.length - 2} outro(s)
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-[11px] text-stone-300 italic">—</span>
                         )}
                       </td>
 
@@ -1136,10 +1291,163 @@ export const ProdutosEstoque: React.FC<ProdutosEstoqueProps> = ({ produtos, onRe
                   )}
                 </div>
 
-                {/* Seção 3: Controle de Estoque */}
+                {/* Seção 3: Fornecedores Vinculados & Preço de Custo */}
+                <div className="bg-amber-50/50 p-4 rounded-2xl border border-amber-200/90 space-y-3.5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-[11px] font-bold text-amber-900 uppercase tracking-wider block">
+                        3. Fornecedores da Peça & Histórico de Preço de Custo
+                      </span>
+                      <p className="text-[11px] text-amber-800 mt-0.5">
+                        Vincule múltiplos fornecedores a este produto, cada um com seu preço de custo.
+                      </p>
+                    </div>
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-200 text-amber-900">
+                      {formFornecedores.length} vinculado(s)
+                    </span>
+                  </div>
+
+                  {/* Lista de Fornecedores Vinculados */}
+                  {formFornecedores.length > 0 ? (
+                    <div className="space-y-2">
+                      {formFornecedores.map(vinculo => {
+                        const forn = fornecedoresCadastrados.find(f => f.id === vinculo.fornecedorId);
+                        const nomeForn = forn?.nome || `Fornecedor (${vinculo.fornecedorId})`;
+                        const temHistorico = Array.isArray(vinculo.historicoPrecos) && vinculo.historicoPrecos.length > 0;
+                        const aberto = historicoAbertoFornId === vinculo.fornecedorId;
+
+                        return (
+                          <div 
+                            key={vinculo.fornecedorId}
+                            className="bg-white rounded-xl border border-amber-200 p-3 shadow-2xs space-y-2"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <Building2 className="w-4 h-4 text-amber-600 shrink-0" />
+                                <div>
+                                  <span className="font-bold text-stone-900 text-xs block leading-tight">
+                                    {nomeForn}
+                                  </span>
+                                  <span className="text-[10px] text-stone-400">
+                                    Atualizado: {vinculo.dataAtualizacaoPreco ? new Date(vinculo.dataAtualizacaoPreco).toLocaleDateString('pt-BR') : '-'}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1">
+                                  <span className="text-[10px] text-stone-500 font-semibold">Custo:</span>
+                                  <input
+                                    type="text"
+                                    value={vinculo.precoCusto}
+                                    onChange={e => handleAlterarCustoFornecedorExistente(vinculo.fornecedorId, e.target.value)}
+                                    className="w-20 px-2 py-1 bg-amber-50 rounded-lg border border-amber-300 text-xs font-mono font-bold text-right text-amber-950 focus:bg-white focus:outline-none"
+                                    title="Alterar preço de custo (o valor anterior será arquivado no histórico)"
+                                  />
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoverFornecedorForm(vinculo.fornecedorId)}
+                                  className="text-stone-400 hover:text-rose-600 p-1 cursor-pointer"
+                                  title="Remover fornecedor deste produto"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Botão de Histórico de Preços se houver */}
+                            {temHistorico && (
+                              <div className="pt-1 border-t border-stone-100">
+                                <button
+                                  type="button"
+                                  onClick={() => setHistoricoAbertoFornId(aberto ? null : vinculo.fornecedorId)}
+                                  className="text-[11px] font-semibold text-amber-800 hover:text-amber-950 flex items-center gap-1 cursor-pointer"
+                                >
+                                  <History className="w-3 h-3 text-amber-600" />
+                                  <span>Histórico de Preços ({vinculo.historicoPrecos?.length} anterior{vinculo.historicoPrecos?.length === 1 ? '' : 'es'})</span>
+                                  {aberto ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                                </button>
+
+                                {aberto && (
+                                  <div className="mt-2 bg-stone-50 rounded-lg p-2 space-y-1 text-[11px] text-stone-600 border border-stone-200">
+                                    <div className="font-semibold text-stone-800 text-[10px] uppercase">Evolução do Preço de Custo:</div>
+                                    <div className="flex items-center justify-between text-emerald-800 font-bold">
+                                      <span>Preço Atual:</span>
+                                      <span>{formatCurrency(vinculo.precoCusto)} ({vinculo.dataAtualizacaoPreco ? new Date(vinculo.dataAtualizacaoPreco).toLocaleDateString('pt-BR') : 'Hoje'})</span>
+                                    </div>
+                                    {vinculo.historicoPrecos?.map((hist, hIdx) => (
+                                      <div key={hIdx} className="flex items-center justify-between text-stone-500">
+                                        <span>Anterior #{vinculo.historicoPrecos!.length - hIdx}:</span>
+                                        <span className="font-mono">{formatCurrency(hist.precoCusto)} em {new Date(hist.dataAtualizacaoPreco).toLocaleDateString('pt-BR')}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-stone-500 italic bg-white/70 p-3 rounded-xl border border-amber-200/60">
+                      Nenhum fornecedor vinculado a esta peça ainda. Selecione abaixo para vincular.
+                    </p>
+                  )}
+
+                  {/* Adicionar Fornecedor */}
+                  <div className="p-3 bg-white rounded-xl border border-amber-200 space-y-2">
+                    <span className="text-[11px] font-bold text-stone-700 block">
+                      + Vincular Fornecedor à Peça
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+                      <div className="sm:col-span-7">
+                        <select
+                          value={novoFornId}
+                          onChange={e => setNovoFornId(e.target.value)}
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-stone-200 text-xs bg-stone-50 focus:bg-white focus:outline-none"
+                        >
+                          <option value="">Selecione o fornecedor...</option>
+                          {fornecedoresCadastrados
+                            .filter(fc => !formFornecedores.some(v => v.fornecedorId === fc.id))
+                            .map(fc => (
+                              <option key={fc.id} value={fc.id}>
+                                {fc.nome}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+
+                      <div className="sm:col-span-3">
+                        <input
+                          type="text"
+                          placeholder="Custo R$"
+                          value={novoFornCusto}
+                          onChange={e => setNovoFornCusto(e.target.value)}
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-stone-200 text-xs font-mono text-right"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <button
+                          type="button"
+                          onClick={handleVincularFornecedorForm}
+                          disabled={!novoFornId || !novoFornCusto}
+                          className="w-full py-1.5 px-2 bg-stone-900 hover:bg-amber-600 disabled:opacity-40 text-white text-xs font-bold rounded-lg transition cursor-pointer"
+                        >
+                          Vincular
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Seção 4: Controle de Estoque */}
                 <div className="bg-stone-50/80 p-4 rounded-2xl border border-stone-200/80 space-y-3.5">
                   <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider block">
-                    3. Saldo Físico & Alerta de Atenção
+                    4. Saldo Físico & Alerta de Atenção
                   </span>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

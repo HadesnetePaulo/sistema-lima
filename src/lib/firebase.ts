@@ -8,7 +8,14 @@ import {
   onSnapshot
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
-import { Produto, Venda, MovimentacaoCaixa, LancamentoFiado } from '../types';
+import { 
+  Produto, 
+  Venda, 
+  MovimentacaoCaixa, 
+  LancamentoFiado,
+  Fornecedor,
+  PedidoCompra
+} from '../types';
 
 // Initialize Firebase App
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
@@ -24,6 +31,8 @@ export interface FirestoreSystemState {
   vendas: Venda[];
   caixa: MovimentacaoCaixa[];
   fiados: LancamentoFiado[];
+  fornecedores?: Fornecedor[];
+  pedidosCompra?: PedidoCompra[];
 }
 
 /**
@@ -59,6 +68,8 @@ export async function fetchStateFromFirestore(): Promise<FirestoreSystemState | 
         vendas: Array.isArray(data.vendas) ? data.vendas : [],
         caixa: Array.isArray(data.caixa) ? data.caixa : [],
         fiados: Array.isArray(data.fiados) ? data.fiados : [],
+        fornecedores: Array.isArray(data.fornecedores) ? data.fornecedores : [],
+        pedidosCompra: Array.isArray(data.pedidosCompra) ? data.pedidosCompra : [],
       };
     }
     return null;
@@ -76,6 +87,8 @@ export async function saveStateToFirestore(state: {
   vendas: Venda[];
   caixa: MovimentacaoCaixa[];
   fiados: LancamentoFiado[];
+  fornecedores?: Fornecedor[];
+  pedidosCompra?: PedidoCompra[];
 }): Promise<boolean> {
   try {
     const docRef = doc(db, 'sistema', 'dados_principais');
@@ -85,6 +98,8 @@ export async function saveStateToFirestore(state: {
       vendas: state.vendas || [],
       caixa: state.caixa || [],
       fiados: state.fiados || [],
+      fornecedores: state.fornecedores || [],
+      pedidosCompra: state.pedidosCompra || [],
     };
     await setDoc(docRef, payload);
     return true;
@@ -116,6 +131,8 @@ export function subscribeToFirestoreState(
             vendas: Array.isArray(data.vendas) ? data.vendas : [],
             caixa: Array.isArray(data.caixa) ? data.caixa : [],
             fiados: Array.isArray(data.fiados) ? data.fiados : [],
+            fornecedores: Array.isArray(data.fornecedores) ? data.fornecedores : [],
+            pedidosCompra: Array.isArray(data.pedidosCompra) ? data.pedidosCompra : [],
           });
         }
       },

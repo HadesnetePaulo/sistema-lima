@@ -24,7 +24,12 @@ import {
   Zap,
   Users,
   UserPlus,
-  Phone
+  Phone,
+  Ban,
+  Percent,
+  Coins,
+  Tag,
+  History
 } from 'lucide-react';
 
 interface NovaVendaProps {
@@ -104,6 +109,8 @@ export const NovaVenda: React.FC<NovaVendaProps> = ({
 
   // Mobile Cart Drawer State
   const [carrinhoMobileAberto, setCarrinhoMobileAberto] = useState(false);
+  const [modalCancelarAberto, setModalCancelarAberto] = useState(false);
+  const [modalExtratoClienteAberto, setModalExtratoClienteAberto] = useState(false);
 
   // Discount & Cash change states
   const [descontoValor, setDescontoValor] = useState('');
@@ -116,6 +123,17 @@ export const NovaVenda: React.FC<NovaVendaProps> = ({
       style: 'currency',
       currency: 'BRL'
     }).format(val);
+  };
+
+  const formatDate = (isoString: string) => {
+    const d = new Date(isoString);
+    return d.toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
   // Filtered products list
@@ -291,6 +309,45 @@ export const NovaVenda: React.FC<NovaVendaProps> = ({
     setErroVenda(null);
   };
 
+  // Cancel current sale and reset inputs
+  const handleConfirmarCancelarVenda = () => {
+    limparCarrinho();
+    setClienteNome('');
+    setClienteWhatsapp('');
+    setClienteSelecionado(null);
+    setBuscaContaInput('');
+    setCriandoNovaConta(false);
+    setDescontoValor('');
+    setValorRecebidoDinheiro('');
+    setModalCancelarAberto(false);
+    setCarrinhoMobileAberto(false);
+    setSucessoMsg('Venda cancelada e carrinho esvaziado.');
+    setTimeout(() => setSucessoMsg(null), 3000);
+  };
+
+  // Get active debt items from selected client's account
+  const itensClienteSelecionado = useMemo(() => {
+    if (!clienteSelecionado) return [];
+    const fiadosAtuais = storage.getFiados();
+    return fiadosAtuais.filter(
+      f => f.cliente_nome.trim().toUpperCase() === clienteSelecionado.nome.trim().toUpperCase() && f.tipo === 'debito'
+    );
+  }, [clienteSelecionado, fiados]);
+
+  // Remove item from selected client's account directly
+  const handleRemoverItemContaCliente = async (id: string, descricao?: string) => {
+    await storage.deleteLancamentoFiado(id, true);
+    onRefreshProdutos();
+    const contas = storage.getContasClientes();
+    setContasClientes(contas);
+    if (clienteSelecionado) {
+      const atual = contas.find(c => c.nome.toUpperCase() === clienteSelecionado.nome.toUpperCase());
+      if (atual) setClienteSelecionado(atual);
+    }
+    setSucessoMsg(`Peça "${descricao || 'Item'}" removida da conta da cliente e devolvida ao estoque!`);
+    setTimeout(() => setSucessoMsg(null), 3000);
+  };
+
   // Finalize Sale with Atomic Stock Deduction
   const handleFinalizarVenda = async () => {
     if (carrinho.length === 0) {
@@ -298,8 +355,8 @@ export const NovaVenda: React.FC<NovaVendaProps> = ({
       return;
     }
 
-    if (formaPagamento.toLowerCase().includes('fiado') && !clienteNome.trim()) {
-      setErroVenda('Por favor, informe o Nome da Cliente para registrar a venda como Fiado / A Prazo.');
+    if ((formaPagamento === 'Conta Corrente' || formaPagamento.toLowerCase().includes('fiado') || formaPagamento.toLowerCase().includes('corrente')) && !clienteNome.trim()) {
+      setErroVenda('Por favor, informe ou selecione o Nome da Cliente para lançar na Conta Corrente.');
       return;
     }
 
@@ -636,99 +693,141 @@ export const NovaVenda: React.FC<NovaVendaProps> = ({
         </div>
 
         {/* Right Side: Desktop Checkout Module (Col 5 / 4) */}
-        <div className="hidden lg:block lg:col-span-5 xl:col-span-4 bg-white rounded-2xl border border-stone-200 shadow-md p-5 sticky top-20">
-          <div className="flex items-center justify-between pb-3 border-b border-stone-100">
-            <div className="flex items-center gap-2">
-              <ShoppingBag className="w-5 h-5 text-amber-600" />
-              <h2 className="font-serif text-lg font-bold text-stone-900">
-                Itens da Venda
-              </h2>
+        <div className="hidden lg:block lg:col-span-5 xl:col-span-4 bg-white rounded-3xl border border-stone-200/90 shadow-md p-5 sticky top-20">
+          {/* Cart Header */}
+          <div className="flex items-center justify-between pb-3.5 border-b border-stone-200">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-700 flex items-center justify-center font-bold">
+                <ShoppingBag className="w-4 h-4 text-amber-600" />
+              </div>
+              <div>
+                <h2 className="font-serif text-lg font-bold text-stone-900 leading-tight">
+                  Carrinho de Venda
+                </h2>
+                <span className="text-[11px] text-stone-500 font-medium">
+                  {totalItens} {totalItens === 1 ? 'peça selecionada' : 'peças selecionadas'}
+                </span>
+              </div>
             </div>
+
             {carrinho.length > 0 && (
               <button
-                onClick={limparCarrinho}
-                className="text-xs text-stone-400 hover:text-rose-600 transition flex items-center gap-1 cursor-pointer"
+                type="button"
+                onClick={() => setModalCancelarAberto(true)}
+                className="px-2.5 py-1.5 rounded-xl text-xs font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 border border-rose-200 transition cursor-pointer flex items-center gap-1.5 shadow-2xs active:scale-95"
+                title="Cancelar esta venda e limpar o carrinho"
               >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Limpar</span>
+                <Ban className="w-3.5 h-3.5" />
+                <span>Cancelar Venda</span>
               </button>
             )}
           </div>
 
           {/* Cart Items List */}
-          <div className="divide-y divide-stone-100 max-h-72 overflow-y-auto my-3 pr-1">
+          <div className="space-y-2.5 max-h-[360px] xl:max-h-[420px] overflow-y-auto my-3.5 pr-1">
             {carrinho.length === 0 ? (
-              <div className="py-12 text-center text-stone-400">
-                <ShoppingBag className="w-8 h-8 text-stone-300 mx-auto mb-2 opacity-70" />
-                <p className="text-xs font-medium text-stone-500">O carrinho está vazio</p>
-                <p className="text-[11px] text-stone-400 mt-0.5">
-                  Bipe o código de barras [F2] ou clique nos produtos para adicionar.
+              <div className="py-10 px-4 text-center rounded-2xl bg-stone-50/70 border border-dashed border-stone-200">
+                <div className="w-12 h-12 rounded-2xl bg-amber-100/60 text-amber-600 flex items-center justify-center mx-auto mb-2.5">
+                  <ShoppingBag className="w-6 h-6 opacity-80" />
+                </div>
+                <p className="text-sm font-bold text-stone-700">Carrinho Vazio</p>
+                <p className="text-xs text-stone-400 mt-1 max-w-[240px] mx-auto leading-relaxed">
+                  Adicione semijoias do catálogo ao lado ou use o leitor de código de barras <span className="font-mono bg-stone-200 px-1 py-0.5 rounded text-[10px]">[F2]</span> para iniciar a venda.
                 </p>
               </div>
             ) : (
               carrinho.map(item => (
-                <div key={item.produto.id} className="py-2.5 flex items-center justify-between gap-2.5">
-                  {/* Item Image Thumbnail */}
-                  <div className="w-10 h-10 rounded-lg bg-stone-100 overflow-hidden shrink-0 border border-stone-200 flex items-center justify-center">
-                    {item.produto.imagem_url ? (
-                      <img
-                        src={item.produto.imagem_url}
-                        alt={item.produto.nome}
-                        referrerPolicy="no-referrer"
-                        className="w-full h-full object-cover"
-                        onError={e => {
-                          (e.target as HTMLImageElement).src = '/logo-lima.jpg';
-                        }}
-                      />
-                    ) : (
-                      <Sparkles className="w-4 h-4 text-amber-500" />
-                    )}
+                <div
+                  key={item.produto.id}
+                  className="p-3 bg-stone-50/80 hover:bg-stone-100/70 border border-stone-200/90 rounded-2xl transition-all shadow-2xs space-y-2.5 group"
+                >
+                  {/* Row 1: Image, Details & Dedicated Delete button */}
+                  <div className="flex items-start justify-between gap-2.5">
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                      <div className="w-11 h-11 rounded-xl bg-white overflow-hidden shrink-0 border border-stone-200/80 flex items-center justify-center shadow-2xs">
+                        {item.produto.imagem_url ? (
+                          <img
+                            src={item.produto.imagem_url}
+                            alt={item.produto.nome}
+                            referrerPolicy="no-referrer"
+                            className="w-full h-full object-cover"
+                            onError={e => {
+                              (e.target as HTMLImageElement).src = '/logo-lima.jpg';
+                            }}
+                          />
+                        ) : (
+                          <Sparkles className="w-5 h-5 text-amber-500" />
+                        )}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-bold text-stone-900 truncate leading-snug" title={item.produto.nome}>
+                          {item.produto.nome}
+                        </p>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="text-[10px] text-amber-900 bg-amber-100/80 px-1.5 py-0.5 rounded font-medium">
+                            {item.produto.categoria}
+                          </span>
+                          <span className="text-[11px] text-stone-500 font-mono">
+                            {formatCurrency(item.produto.preco)} un
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Dedicated Delete / Remove Button */}
+                    <button
+                      type="button"
+                      onClick={() => removerDoCarrinho(item.produto.id)}
+                      className="p-1.5 rounded-lg text-stone-400 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition cursor-pointer shrink-0"
+                      title="Remover esta peça do carrinho"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
 
-                  <div className="flex-1 min-w-0 pr-1">
-                    <p className="text-xs font-semibold text-stone-900 truncate">
-                      {item.produto.nome}
-                    </p>
-                    <p className="text-[11px] text-stone-500 mt-0.5">
-                      {formatCurrency(item.produto.preco)} un · Subtotal:{' '}
-                      <span className="font-semibold text-stone-800">
+                  {/* Row 2: Quantity Controls Stepper & Item Subtotal */}
+                  <div className="flex items-center justify-between pt-1 border-t border-stone-200/60">
+                    <div className="flex items-center gap-1.5 bg-white px-1.5 py-1 rounded-xl border border-stone-200/80 shadow-2xs">
+                      <button
+                        type="button"
+                        onClick={() => removerUnidade(item.produto.id)}
+                        className={`w-7 h-7 rounded-lg flex items-center justify-center transition cursor-pointer active:scale-90 ${
+                          item.quantidade === 1
+                            ? 'bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-200'
+                            : 'hover:bg-stone-100 text-stone-700'
+                        }`}
+                        title={item.quantidade === 1 ? 'Remover do carrinho' : 'Diminuir 1 un'}
+                      >
+                        {item.quantidade === 1 ? <Trash2 className="w-3.5 h-3.5 text-rose-600" /> : <Minus className="w-3.5 h-3.5" />}
+                      </button>
+
+                      <span className="w-6 text-center font-bold text-xs text-stone-900 tabular-nums">
+                        {item.quantidade}
+                      </span>
+
+                      <button
+                        type="button"
+                        onClick={() => adicionarAoCarrinho(item.produto)}
+                        disabled={item.quantidade >= item.produto.quantidade_estoque}
+                        className={`w-7 h-7 rounded-lg flex items-center justify-center transition active:scale-90 ${
+                          item.quantidade >= item.produto.quantidade_estoque
+                            ? 'text-stone-300 cursor-not-allowed'
+                            : 'hover:bg-amber-100 hover:text-amber-950 text-stone-700 cursor-pointer'
+                        }`}
+                        title={item.quantidade >= item.produto.quantidade_estoque ? 'Limite de estoque atingido' : 'Aumentar 1 un'}
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    <div className="text-right">
+                      <span className="text-[10px] text-stone-400 block font-medium">Subtotal</span>
+                      <span className="font-serif font-bold text-sm text-stone-900 tabular-nums">
                         {formatCurrency(item.quantidade * item.produto.preco)}
                       </span>
-                    </p>
+                    </div>
                   </div>
-
-                  <div className="flex items-center gap-1.5 shrink-0 bg-stone-100 p-1 rounded-lg">
-                    <button
-                      onClick={() => removerUnidade(item.produto.id)}
-                      className="w-6 h-6 rounded flex items-center justify-center bg-white text-stone-700 hover:bg-stone-200 transition"
-                      title="Diminuir"
-                    >
-                      <Minus className="w-3 h-3" />
-                    </button>
-                    <span className="text-xs font-bold text-stone-900 w-5 text-center tabular-nums">
-                      {item.quantidade}
-                    </span>
-                    <button
-                      onClick={() => adicionarAoCarrinho(item.produto)}
-                      disabled={item.quantidade >= item.produto.quantidade_estoque}
-                      className={`w-6 h-6 rounded flex items-center justify-center transition ${
-                        item.quantidade >= item.produto.quantidade_estoque
-                          ? 'bg-stone-200 text-stone-400 cursor-not-allowed'
-                          : 'bg-white text-stone-700 hover:bg-stone-200'
-                      }`}
-                      title="Aumentar"
-                    >
-                      <Plus className="w-3 h-3" />
-                    </button>
-                  </div>
-
-                  <button
-                    onClick={() => removerDoCarrinho(item.produto.id)}
-                    className="text-stone-300 hover:text-rose-500 p-1 transition cursor-pointer"
-                    title="Remover item"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
                 </div>
               ))
             )}
@@ -755,7 +854,7 @@ export const NovaVenda: React.FC<NovaVendaProps> = ({
                   {forma.includes('Cartão') && <CreditCard className="w-3.5 h-3.5 text-blue-600" />}
                   {forma === 'Dinheiro' && <Banknote className="w-3.5 h-3.5 text-emerald-600" />}
                   {forma === 'Transferência' && <ArrowRight className="w-3.5 h-3.5 text-purple-600" />}
-                  {forma.includes('Fiado') && <Users className="w-3.5 h-3.5 text-amber-700" />}
+                  {(forma.includes('Corrente') || forma.includes('Fiado')) && <Users className="w-3.5 h-3.5 text-amber-700" />}
                   <span className="truncate">{forma}</span>
                 </button>
               ))}
@@ -822,11 +921,11 @@ export const NovaVenda: React.FC<NovaVendaProps> = ({
               <div className="flex items-center justify-between">
                 <label className="text-xs font-semibold text-stone-800 flex items-center gap-1.5">
                   <Users className="w-3.5 h-3.5 text-amber-600" />
-                  <span>Conta da Cliente:</span>
+                  <span>Conta Corrente da Cliente:</span>
                 </label>
-                {formaPagamento.toLowerCase().includes('fiado') ? (
+                {(formaPagamento === 'Conta Corrente' || formaPagamento.toLowerCase().includes('corrente') || formaPagamento.toLowerCase().includes('fiado')) ? (
                   <span className="text-[10px] font-bold text-amber-900 bg-amber-100 px-2 py-0.5 rounded-md border border-amber-300">
-                    Obrigatório p/ Fiado
+                    Obrigatório p/ Conta Corrente
                   </span>
                 ) : (
                   <span className="text-[10px] text-stone-400 font-medium">
@@ -866,23 +965,47 @@ export const NovaVenda: React.FC<NovaVendaProps> = ({
                   </div>
 
                   {/* Status da Conta: Débito em aberto ou em dia */}
-                  <div className="pt-1 flex items-center justify-between border-t border-amber-200/70 text-[10px]">
-                    {clienteSelecionado.saldoDevedor > 0 ? (
-                      <span className="text-amber-950 font-semibold flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />
-                        Débito em aberto: <strong>{formatCurrency(clienteSelecionado.saldoDevedor)}</strong>
-                      </span>
-                    ) : (
-                      <span className="text-emerald-700 font-semibold flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
-                        Conta em dia (sem débitos)
-                      </span>
+                  <div className="pt-1 flex flex-col gap-1 border-t border-amber-200/70 text-[10px]">
+                    <div className="flex items-center justify-between">
+                      {clienteSelecionado.saldoDevedor > 0 ? (
+                        <span className="text-amber-950 font-semibold flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />
+                          Saldo anterior: <strong>{formatCurrency(clienteSelecionado.saldoDevedor)}</strong>
+                        </span>
+                      ) : (
+                        <span className="text-emerald-700 font-semibold flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
+                          Conta em dia (sem débitos)
+                        </span>
+                      )}
+
+                      {(formaPagamento === 'Conta Corrente' || formaPagamento.toLowerCase().includes('corrente') || formaPagamento.toLowerCase().includes('fiado')) && (
+                        <span className="font-bold text-amber-900">
+                          + {formatCurrency(valorTotal)} nesta compra
+                        </span>
+                      )}
+                    </div>
+
+                    {(formaPagamento === 'Conta Corrente' || formaPagamento.toLowerCase().includes('corrente') || formaPagamento.toLowerCase().includes('fiado')) && (
+                      <div className="p-1.5 rounded-lg bg-amber-100/70 border border-amber-200 flex justify-between items-center text-[11px] font-bold text-amber-950">
+                        <span>Novo saldo total da conta:</span>
+                        <span className="text-xs text-rose-700 font-mono">
+                          {formatCurrency(clienteSelecionado.saldoDevedor + valorTotal)}
+                        </span>
+                      </div>
                     )}
 
-                    {formaPagamento.toLowerCase().includes('fiado') && (
-                      <span className="font-bold text-amber-900">
-                        + {formatCurrency(valorTotal)} nesta venda
-                      </span>
+                    {/* Botão para visualizar e remover itens da conta da cliente */}
+                    {itensClienteSelecionado.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setModalExtratoClienteAberto(true)}
+                        className="w-full mt-1 py-1.5 px-2 bg-white hover:bg-amber-100/80 text-amber-950 font-bold text-[10px] rounded-lg border border-amber-300 transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                        title="Ver e remover peças compradas nesta conta corrente"
+                      >
+                        <History className="w-3 h-3 text-amber-700" />
+                        <span>Ver Peças da Conta ({itensClienteSelecionado.length}) / Remover</span>
+                      </button>
                     )}
                   </div>
                 </div>
@@ -905,7 +1028,7 @@ export const NovaVenda: React.FC<NovaVendaProps> = ({
                   <div>
                     <input
                       type="text"
-                      required={formaPagamento.toLowerCase().includes('fiado')}
+                      required={formaPagamento === 'Conta Corrente' || formaPagamento.toLowerCase().includes('corrente') || formaPagamento.toLowerCase().includes('fiado')}
                       value={clienteNome}
                       onChange={e => setClienteNome(e.target.value)}
                       placeholder="Nome completo da cliente *"
@@ -1028,24 +1151,56 @@ export const NovaVenda: React.FC<NovaVendaProps> = ({
               )}
             </div>
 
-            {/* Desconto Opcional */}
-            <div className="pt-2 flex items-center justify-between text-xs border-t border-stone-100">
-              <span className="text-stone-500 font-medium">Aplicar Desconto:</span>
-              <div className="w-28 relative">
-                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] text-stone-400">R$</span>
-                <input
-                  type="text"
-                  value={descontoValor}
-                  onChange={e => setDescontoValor(e.target.value)}
-                  placeholder="0,00"
-                  className="w-full pl-7 pr-2 py-1 bg-stone-50 border border-stone-200 rounded-lg text-xs text-right font-medium text-stone-800 focus:outline-none focus:border-amber-500"
-                />
+            {/* Desconto Opcional com Chips Rápidos */}
+            <div className="pt-2.5 space-y-1.5 border-t border-stone-200/70">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-stone-600 font-semibold flex items-center gap-1">
+                  <Tag className="w-3.5 h-3.5 text-stone-500" />
+                  <span>Desconto:</span>
+                </span>
+                <div className="w-28 relative">
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] text-stone-400 font-semibold">R$</span>
+                  <input
+                    type="text"
+                    value={descontoValor}
+                    onChange={e => setDescontoValor(e.target.value)}
+                    placeholder="0,00"
+                    className="w-full pl-7 pr-2 py-1.5 bg-stone-50 border border-stone-200 rounded-lg text-xs text-right font-bold text-stone-800 focus:outline-none focus:border-amber-500 focus:bg-white"
+                  />
+                </div>
+              </div>
+
+              {/* Quick Discount Chips */}
+              <div className="flex items-center gap-1.5 justify-end">
+                {[5, 10, 20].map(v => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setDescontoValor(v.toString())}
+                    className={`px-2 py-0.5 rounded-md text-[10px] font-semibold border transition cursor-pointer ${
+                      descontoValor === v.toString()
+                        ? 'bg-amber-100 text-amber-950 border-amber-300 font-bold'
+                        : 'bg-stone-100 text-stone-600 border-stone-200 hover:bg-stone-200'
+                    }`}
+                  >
+                    -R$ {v}
+                  </button>
+                ))}
+                {descontoValor && (
+                  <button
+                    type="button"
+                    onClick={() => setDescontoValor('')}
+                    className="px-1.5 py-0.5 rounded-md text-[10px] font-bold text-stone-400 hover:text-rose-600 transition cursor-pointer"
+                  >
+                    Limpar
+                  </button>
+                )}
               </div>
             </div>
           </div>
 
           {/* Cart Summary */}
-          <div className="mt-3 pt-3 border-t border-stone-200 space-y-1.5 text-xs text-stone-600">
+          <div className="mt-3.5 pt-3.5 border-t border-stone-200 space-y-1.5 text-xs text-stone-600 bg-stone-50/60 -mx-5 px-5 py-3 rounded-b-3xl">
             <div className="flex justify-between">
               <span>Subtotal ({totalItens} peças):</span>
               <span className="font-semibold text-stone-800">{formatCurrency(valorSubtotal)}</span>
@@ -1056,33 +1211,45 @@ export const NovaVenda: React.FC<NovaVendaProps> = ({
                 <span>- {formatCurrency(descontoNum)}</span>
               </div>
             )}
-            <div className="flex justify-between items-baseline pt-1.5 border-t border-stone-100">
+            <div className="flex justify-between items-baseline pt-2 border-t border-stone-200/80">
               <span className="text-sm font-bold text-stone-900">Total a Pagar:</span>
-              <span className="text-2xl font-bold font-serif text-stone-900 tabular-nums">
+              <span className="text-2xl sm:text-3xl font-bold font-serif text-stone-900 tabular-nums">
                 {formatCurrency(valorTotal)}
               </span>
             </div>
-          </div>
 
-          {/* Finalize Button with Enter shortcut badge */}
-          <button
-            type="button"
-            disabled={carrinho.length === 0 || isFinalizando}
-            onClick={handleFinalizarVenda}
-            className={`w-full mt-4 py-3.5 rounded-xl font-bold text-sm transition cursor-pointer flex items-center justify-center gap-2 shadow-md ${
-              carrinho.length === 0 || isFinalizando
-                ? 'bg-stone-200 text-stone-400 cursor-not-allowed shadow-none'
-                : 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-stone-950 active:scale-98 shadow-amber-900/20'
-            }`}
-          >
-            <CheckCircle2 className="w-4 h-4" />
-            <span>
-              {isFinalizando ? 'Registrando Venda...' : `Concluir Venda (${formatCurrency(valorTotal)})`}
-            </span>
-            <span className="hidden lg:inline text-[10px] bg-stone-950/15 text-stone-900 px-1.5 py-0.5 rounded font-mono font-bold ml-1">
-              ↵ Enter
-            </span>
-          </button>
+            {/* Finalize Button with Enter shortcut badge */}
+            <button
+              type="button"
+              disabled={carrinho.length === 0 || isFinalizando}
+              onClick={handleFinalizarVenda}
+              className={`w-full mt-3 py-3.5 rounded-xl font-bold text-sm transition cursor-pointer flex items-center justify-center gap-2 shadow-md ${
+                carrinho.length === 0 || isFinalizando
+                  ? 'bg-stone-200 text-stone-400 cursor-not-allowed shadow-none'
+                  : 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-stone-950 active:scale-98 shadow-amber-900/20'
+              }`}
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              <span>
+                {isFinalizando ? 'Registrando Venda...' : `Concluir Venda (${formatCurrency(valorTotal)})`}
+              </span>
+              <span className="hidden lg:inline text-[10px] bg-stone-950/15 text-stone-900 px-1.5 py-0.5 rounded font-mono font-bold ml-1">
+                ↵ Enter
+              </span>
+            </button>
+
+            {carrinho.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setModalCancelarAberto(true)}
+                className="w-full mt-2 py-2.5 rounded-xl border border-rose-200 bg-rose-50/80 hover:bg-rose-100 text-rose-700 font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-2xs active:scale-98"
+                title="Cancela a venda em andamento e esvazia todos os itens do carrinho"
+              >
+                <Ban className="w-3.5 h-3.5" />
+                <span>Cancelar Venda / Limpar Carrinho</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1119,87 +1286,174 @@ export const NovaVenda: React.FC<NovaVendaProps> = ({
 
       {/* MOBILE BOTTOM SHEET CART DRAWER */}
       {carrinhoMobileAberto && (
-        <div className="lg:hidden fixed inset-0 z-50 flex flex-col justify-end bg-black/60 backdrop-blur-xs">
-          <div className="w-full max-h-[90vh] bg-white rounded-t-3xl shadow-2xl flex flex-col animate-in slide-in-from-bottom duration-250">
+        <div
+          className="lg:hidden fixed inset-0 z-50 flex flex-col justify-end bg-black/60 backdrop-blur-xs"
+          onClick={() => setCarrinhoMobileAberto(false)}
+        >
+          <div
+            className="w-full h-[92vh] max-h-[92vh] bg-white rounded-t-3xl shadow-2xl flex flex-col animate-in slide-in-from-bottom duration-250 overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
             {/* Grab Handle */}
-            <div className="w-12 h-1.5 bg-stone-300 rounded-full mx-auto my-3" />
+            <div className="w-12 h-1.5 bg-stone-300 rounded-full mx-auto my-2.5 shrink-0" />
 
-            <div className="px-5 pb-3 border-b border-stone-100 flex items-center justify-between">
+            {/* Mobile Header (Fixed) */}
+            <div className="px-5 py-3 border-b border-stone-200 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2">
                 <ShoppingBag className="w-5 h-5 text-amber-600" />
-                <h3 className="font-serif text-lg font-bold text-stone-900">
-                  Carrinho de Venda
-                </h3>
-                <span className="text-xs text-stone-500 font-medium">
-                  ({totalItens} {totalItens === 1 ? 'peça' : 'peças'})
-                </span>
-              </div>
-              <button
-                onClick={() => setCarrinhoMobileAberto(false)}
-                className="w-10 h-10 rounded-full bg-stone-100 hover:bg-stone-200 flex items-center justify-center text-stone-600 active:scale-95"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Scrollable Items in Mobile Drawer with generous spacing */}
-            <div className="flex-1 overflow-y-auto px-5 py-3 divide-y divide-stone-100">
-              {carrinho.length === 0 ? (
-                <div className="py-12 text-center text-stone-400">
-                  <ShoppingBag className="w-10 h-10 text-stone-300 mx-auto mb-2 opacity-70" />
-                  <p className="text-sm font-semibold text-stone-600">O carrinho está vazio</p>
+                <div>
+                  <h3 className="font-serif text-lg font-bold text-stone-900 leading-tight">
+                    Carrinho de Venda
+                  </h3>
+                  <span className="text-[11px] text-stone-500 font-medium">
+                    {totalItens} {totalItens === 1 ? 'peça selecionada' : 'peças selecionadas'}
+                  </span>
                 </div>
-              ) : (
-                carrinho.map(item => (
-                  <div key={item.produto.id} className="py-3.5 flex items-center justify-between gap-3">
-                    <div className="flex-1 min-w-0 pr-1">
-                      <p className="text-sm font-semibold text-stone-900 truncate">
-                        {item.produto.nome}
-                      </p>
-                      <p className="text-xs text-stone-500 mt-0.5">
-                        {formatCurrency(item.produto.preco)} un ·{' '}
-                        <strong className="text-stone-800">
-                          {formatCurrency(item.quantidade * item.produto.preco)}
-                        </strong>
-                      </p>
-                    </div>
+              </div>
 
-                    {/* Touch Friendly Stepper Hitbox >= 44px */}
-                    <div className="flex items-center gap-1.5 bg-stone-100 p-1 rounded-xl">
-                      <button
-                        onClick={() => removerUnidade(item.produto.id)}
-                        className="w-10 h-10 rounded-lg bg-white text-stone-800 flex items-center justify-center active:scale-95 shadow-xs font-bold"
-                      >
-                        <Minus className="w-4 h-4" />
-                      </button>
-                      <span className="w-7 text-center font-bold text-xs tabular-nums text-stone-900">
-                        {item.quantidade}
-                      </span>
-                      <button
-                        onClick={() => adicionarAoCarrinho(item.produto)}
-                        disabled={item.quantidade >= item.produto.quantidade_estoque}
-                        className="w-10 h-10 rounded-lg bg-white text-stone-800 flex items-center justify-center active:scale-95 shadow-xs font-bold disabled:opacity-40"
-                      >
-                        <Plus className="w-4 h-4" />
-                      </button>
-                    </div>
-
-                    <button
-                      onClick={() => removerDoCarrinho(item.produto.id)}
-                      className="p-2.5 text-stone-400 hover:text-rose-600 active:scale-95"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))
-              )}
+              <div className="flex items-center gap-2">
+                {carrinho.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setModalCancelarAberto(true)}
+                    className="px-2.5 py-1.5 rounded-xl text-xs font-bold text-rose-600 bg-rose-50 border border-rose-200 transition cursor-pointer flex items-center gap-1 active:scale-95"
+                    title="Cancelar esta venda e limpar o carrinho"
+                  >
+                    <Ban className="w-3.5 h-3.5" />
+                    <span>Cancelar</span>
+                  </button>
+                )}
+                <button
+                  onClick={() => setCarrinhoMobileAberto(false)}
+                  className="w-9 h-9 rounded-full bg-stone-100 hover:bg-stone-200 flex items-center justify-center text-stone-600 active:scale-95"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
-            {/* Mobile Drawer Checkout Controls */}
-            <div className="p-5 bg-stone-50 border-t border-stone-200 space-y-3.5 pb-safe">
-              {/* Payment selector */}
-              <div>
-                <label className="block text-xs font-semibold text-stone-700 mb-2">
+            {/* Single Unified Scrollable Body: Items, Payment, Dinheiro, Conta, Desconto, Resumo */}
+            <div
+              className="flex-1 overflow-y-auto px-4 py-3.5 space-y-4 overscroll-contain touch-pan-y"
+              style={{ WebkitOverflowScrolling: 'touch' }}
+            >
+              {/* SECTION 1: Items List */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-stone-700 uppercase tracking-wider">
+                    Peças no Carrinho ({totalItens})
+                  </span>
+                  {carrinho.length > 0 && (
+                    <span className="text-[11px] text-stone-400 font-mono">
+                      Subtotal: {formatCurrency(valorSubtotal)}
+                    </span>
+                  )}
+                </div>
+
+                {carrinho.length === 0 ? (
+                  <div className="py-10 text-center rounded-2xl bg-stone-50 border border-dashed border-stone-200">
+                    <ShoppingBag className="w-10 h-10 text-stone-300 mx-auto mb-2 opacity-70" />
+                    <p className="text-sm font-semibold text-stone-600">O carrinho está vazio</p>
+                    <p className="text-xs text-stone-400 mt-1">Selecione semijoias para adicionar à venda.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {carrinho.map(item => (
+                      <div
+                        key={item.produto.id}
+                        className="p-3 bg-stone-50/90 border border-stone-200 rounded-2xl space-y-2.5 shadow-2xs"
+                      >
+                        <div className="flex items-start justify-between gap-2.5">
+                          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                            <div className="w-12 h-12 rounded-xl bg-white overflow-hidden shrink-0 border border-stone-200 flex items-center justify-center shadow-2xs">
+                              {item.produto.imagem_url ? (
+                                <img
+                                  src={item.produto.imagem_url}
+                                  alt={item.produto.nome}
+                                  referrerPolicy="no-referrer"
+                                  className="w-full h-full object-cover"
+                                  onError={e => {
+                                    (e.target as HTMLImageElement).src = '/logo-lima.jpg';
+                                  }}
+                                />
+                              ) : (
+                                <Sparkles className="w-5 h-5 text-amber-500" />
+                              )}
+                            </div>
+
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-bold text-stone-900 truncate">
+                                {item.produto.nome}
+                              </p>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <span className="text-[10px] text-amber-900 bg-amber-100 px-1.5 py-0.5 rounded font-medium">
+                                  {item.produto.categoria}
+                                </span>
+                                <span className="text-xs text-stone-500 font-mono">
+                                  {formatCurrency(item.produto.preco)} un
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Dedicated Remove from Cart Button */}
+                          <button
+                            type="button"
+                            onClick={() => removerDoCarrinho(item.produto.id)}
+                            className="p-2 text-stone-400 hover:text-rose-600 active:scale-95 bg-white border border-stone-200 rounded-xl"
+                            title="Remover do carrinho"
+                          >
+                            <Trash2 className="w-4 h-4 text-rose-600" />
+                          </button>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-1 border-t border-stone-200/60">
+                          {/* Touch Friendly Stepper Hitbox */}
+                          <div className="flex items-center gap-2 bg-white p-1 rounded-xl border border-stone-200 shadow-2xs">
+                            <button
+                              type="button"
+                              onClick={() => removerUnidade(item.produto.id)}
+                              className={`w-9 h-9 rounded-lg flex items-center justify-center active:scale-90 font-bold ${
+                                item.quantidade === 1
+                                  ? 'bg-rose-50 text-rose-600 border border-rose-200'
+                                  : 'bg-stone-100 text-stone-800'
+                              }`}
+                              title={item.quantidade === 1 ? 'Remover do carrinho' : 'Diminuir 1 un'}
+                            >
+                              {item.quantidade === 1 ? <Trash2 className="w-4 h-4 text-rose-600" /> : <Minus className="w-4 h-4" />}
+                            </button>
+
+                            <span className="w-7 text-center font-bold text-sm tabular-nums text-stone-900">
+                              {item.quantidade}
+                            </span>
+
+                            <button
+                              type="button"
+                              onClick={() => adicionarAoCarrinho(item.produto)}
+                              disabled={item.quantidade >= item.produto.quantidade_estoque}
+                              className="w-9 h-9 rounded-lg bg-amber-500 text-stone-950 flex items-center justify-center active:scale-90 font-bold disabled:opacity-40"
+                              title="Aumentar"
+                            >
+                              <Plus className="w-4 h-4" />
+                            </button>
+                          </div>
+
+                          <div className="text-right">
+                            <span className="text-[10px] text-stone-400 block font-medium">Subtotal</span>
+                            <span className="font-serif font-bold text-sm text-stone-900 tabular-nums">
+                              {formatCurrency(item.quantidade * item.produto.preco)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* SECTION 2: Forma de Pagamento */}
+              <div className="p-3.5 bg-stone-50 rounded-2xl border border-stone-200 space-y-3">
+                <label className="block text-xs font-bold text-stone-800">
                   Forma de Pagamento:
                 </label>
                 <div className="grid grid-cols-2 gap-2">
@@ -1208,7 +1462,7 @@ export const NovaVenda: React.FC<NovaVendaProps> = ({
                       key={forma}
                       type="button"
                       onClick={() => setFormaPagamento(forma)}
-                      className={`px-3.5 py-3 rounded-xl text-xs font-semibold transition cursor-pointer text-left flex items-center gap-2 min-h-[48px] active:scale-98 ${
+                      className={`px-3 py-2.5 rounded-xl text-xs font-semibold transition cursor-pointer text-left flex items-center gap-2 min-h-[44px] active:scale-98 ${
                         formaPagamento === forma
                           ? 'bg-amber-100 text-amber-950 border-2 border-amber-400 font-bold shadow-xs'
                           : 'bg-white text-stone-700 border border-stone-200 hover:bg-stone-50'
@@ -1218,22 +1472,77 @@ export const NovaVenda: React.FC<NovaVendaProps> = ({
                       {forma.includes('Cartão') && <CreditCard className="w-4 h-4 text-blue-600 shrink-0" />}
                       {forma === 'Dinheiro' && <Banknote className="w-4 h-4 text-emerald-600 shrink-0" />}
                       {forma === 'Transferência' && <ArrowRight className="w-4 h-4 text-purple-600 shrink-0" />}
-                      {forma.includes('Fiado') && <Users className="w-4 h-4 text-amber-700 shrink-0" />}
+                      {(forma.includes('Corrente') || forma.includes('Fiado')) && <Users className="w-4 h-4 text-amber-700 shrink-0" />}
                       <span className="truncate">{forma}</span>
                     </button>
                   ))}
                 </div>
 
-                {/* Seletor de Conta / Cliente Cadastrado (Mobile Drawer) */}
-                <div className="mt-3 pt-3 border-t border-stone-200/80 space-y-2">
+                {/* Dinheiro & Calculadora de Troco (Mobile) */}
+                {formaPagamento === 'Dinheiro' && (
+                  <div className="p-3 bg-emerald-50/80 border border-emerald-200 rounded-xl space-y-2 text-xs animate-in fade-in">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-emerald-950 flex items-center gap-1.5">
+                        <Banknote className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Valor Recebido em Dinheiro:</span>
+                      </span>
+                      {trocoCalculado > 0 && (
+                        <span className="text-[11px] font-bold text-emerald-800 bg-white px-2 py-0.5 rounded border border-emerald-300 shadow-2xs">
+                          Troco: {formatCurrency(trocoCalculado)}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-stone-500">R$</span>
+                      <input
+                        type="text"
+                        value={valorRecebidoDinheiro}
+                        onChange={e => setValorRecebidoDinheiro(e.target.value)}
+                        placeholder="Ex: 100,00"
+                        className="w-full pl-9 pr-3 py-2 bg-white border border-emerald-300 rounded-lg text-xs font-bold text-stone-900 focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-1.5 pt-0.5 overflow-x-auto no-scrollbar">
+                      {[20, 50, 100, 150, 200].map(val => (
+                        <button
+                          key={val}
+                          type="button"
+                          onClick={() => setValorRecebidoDinheiro(val.toString())}
+                          className="px-2.5 py-1 bg-white hover:bg-emerald-100 text-emerald-900 text-[10px] font-semibold rounded-md border border-emerald-200 transition cursor-pointer"
+                        >
+                          R$ {val}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => setValorRecebidoDinheiro(valorTotal.toFixed(2))}
+                        className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded-md transition cursor-pointer"
+                      >
+                        Exato
+                      </button>
+                    </div>
+
+                    {trocoCalculado > 0 && (
+                      <div className="p-2 bg-emerald-600 text-white rounded-lg flex items-center justify-between text-xs font-bold shadow-xs">
+                        <span>Troco a Devolver:</span>
+                        <span className="text-sm font-black tabular-nums">{formatCurrency(trocoCalculado)}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Seletor de Conta / Cliente Cadastrado (Mobile) */}
+                <div className="pt-2 border-t border-stone-200/80 space-y-2">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-semibold text-stone-800 flex items-center gap-1.5">
                       <Users className="w-3.5 h-3.5 text-amber-600" />
-                      <span>Conta da Cliente:</span>
+                      <span>Conta Corrente da Cliente:</span>
                     </label>
-                    {formaPagamento.toLowerCase().includes('fiado') ? (
+                    {(formaPagamento === 'Conta Corrente' || formaPagamento.toLowerCase().includes('corrente') || formaPagamento.toLowerCase().includes('fiado')) ? (
                       <span className="text-[10px] font-bold text-amber-900 bg-amber-100 px-2 py-0.5 rounded-md border border-amber-300">
-                        Obrigatório p/ Fiado
+                        Obrigatório
                       </span>
                     ) : (
                       <span className="text-[10px] text-stone-400 font-medium">
@@ -1243,7 +1552,7 @@ export const NovaVenda: React.FC<NovaVendaProps> = ({
                   </div>
 
                   {clienteSelecionado ? (
-                    <div className="p-3 rounded-xl bg-amber-50 border border-amber-300 shadow-2xs space-y-1.5 animate-in fade-in">
+                    <div className="p-3 rounded-xl bg-amber-50 border border-amber-300 shadow-2xs space-y-2 animate-in fade-in">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 min-w-0">
                           <div className="w-8 h-8 rounded-lg bg-amber-500 text-stone-950 font-bold text-xs flex items-center justify-center shrink-0">
@@ -1270,15 +1579,43 @@ export const NovaVenda: React.FC<NovaVendaProps> = ({
                         </button>
                       </div>
 
-                      <div className="pt-1 flex items-center justify-between border-t border-amber-200 text-[10px]">
-                        {clienteSelecionado.saldoDevedor > 0 ? (
-                          <span className="text-amber-950 font-semibold">
-                            ⚠️ Débito anterior: <strong>{formatCurrency(clienteSelecionado.saldoDevedor)}</strong>
-                          </span>
-                        ) : (
-                          <span className="text-emerald-700 font-semibold">
-                            ✓ Conta em dia
-                          </span>
+                      <div className="pt-1 flex flex-col gap-1 border-t border-amber-200 text-[10px]">
+                        <div className="flex items-center justify-between">
+                          {clienteSelecionado.saldoDevedor > 0 ? (
+                            <span className="text-amber-950 font-semibold">
+                              Saldo anterior: <strong>{formatCurrency(clienteSelecionado.saldoDevedor)}</strong>
+                            </span>
+                          ) : (
+                            <span className="text-emerald-700 font-semibold">
+                              ✓ Conta em dia
+                            </span>
+                          )}
+
+                          {(formaPagamento === 'Conta Corrente' || formaPagamento.toLowerCase().includes('corrente') || formaPagamento.toLowerCase().includes('fiado')) && (
+                            <span className="font-bold text-amber-900">
+                              + {formatCurrency(valorTotal)}
+                            </span>
+                          )}
+                        </div>
+
+                        {(formaPagamento === 'Conta Corrente' || formaPagamento.toLowerCase().includes('corrente') || formaPagamento.toLowerCase().includes('fiado')) && (
+                          <div className="p-1 rounded bg-amber-100 flex justify-between font-bold text-amber-950 text-[10px]">
+                            <span>Novo saldo da conta:</span>
+                            <span className="text-rose-700">{formatCurrency(clienteSelecionado.saldoDevedor + valorTotal)}</span>
+                          </div>
+                        )}
+
+                        {/* Botão para visualizar e remover itens da conta da cliente (Mobile) */}
+                        {itensClienteSelecionado.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setModalExtratoClienteAberto(true)}
+                            className="w-full mt-1.5 py-1.5 px-2 bg-amber-100 hover:bg-amber-200 text-amber-950 font-bold text-[10px] rounded-lg border border-amber-300 transition flex items-center justify-center gap-1 cursor-pointer"
+                            title="Ver e remover peças da conta da cliente"
+                          >
+                            <History className="w-3 h-3 text-amber-700" />
+                            <span>Ver Peças da Conta ({itensClienteSelecionado.length}) / Remover</span>
+                          </button>
                         )}
                       </div>
                     </div>
@@ -1287,7 +1624,7 @@ export const NovaVenda: React.FC<NovaVendaProps> = ({
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-stone-800 text-[11px] flex items-center gap-1">
                           <UserPlus className="w-3.5 h-3.5 text-amber-600" />
-                          <span>Cadastrar Nova Cliente:</span>
+                          <span>Cadastrar Nova Cliente na Conta:</span>
                         </span>
                         <button
                           type="button"
@@ -1299,7 +1636,7 @@ export const NovaVenda: React.FC<NovaVendaProps> = ({
                       </div>
                       <input
                         type="text"
-                        required={formaPagamento.toLowerCase().includes('fiado')}
+                        required={formaPagamento === 'Conta Corrente' || formaPagamento.toLowerCase().includes('corrente') || formaPagamento.toLowerCase().includes('fiado')}
                         value={clienteNome}
                         onChange={e => setClienteNome(e.target.value)}
                         placeholder="Nome completo da cliente *"
@@ -1397,10 +1734,95 @@ export const NovaVenda: React.FC<NovaVendaProps> = ({
                 </div>
               </div>
 
-              {/* Total & Action */}
-              <div className="flex items-baseline justify-between pt-1">
-                <span className="text-xs text-stone-500 font-medium">Total da Venda:</span>
-                <span className="text-2xl font-bold font-serif text-stone-900 tabular-nums">
+              {/* SECTION 3: Desconto Opcional (Mobile) */}
+              <div className="p-3.5 bg-stone-50 rounded-2xl border border-stone-200 space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-stone-700 font-semibold flex items-center gap-1.5">
+                    <Tag className="w-3.5 h-3.5 text-stone-500" />
+                    <span>Desconto na Venda:</span>
+                  </span>
+                  <div className="w-28 relative">
+                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] text-stone-400 font-semibold">R$</span>
+                    <input
+                      type="text"
+                      value={descontoValor}
+                      onChange={e => setDescontoValor(e.target.value)}
+                      placeholder="0,00"
+                      className="w-full pl-7 pr-2 py-1.5 bg-white border border-stone-300 rounded-lg text-xs text-right font-bold text-stone-900 focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 justify-end">
+                  {[5, 10, 20].map(v => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setDescontoValor(v.toString())}
+                      className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold border transition cursor-pointer ${
+                        descontoValor === v.toString()
+                          ? 'bg-amber-100 text-amber-950 border-amber-300 font-bold'
+                          : 'bg-white text-stone-600 border-stone-200 hover:bg-stone-100'
+                      }`}
+                    >
+                      -R$ {v}
+                    </button>
+                  ))}
+                  {descontoValor && (
+                    <button
+                      type="button"
+                      onClick={() => setDescontoValor('')}
+                      className="px-2 py-1 rounded-lg text-[10px] font-bold text-stone-400 hover:text-rose-600 transition"
+                    >
+                      Limpar
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* SECTION 4: Resumo dos Valores (Mobile) */}
+              <div className="p-3.5 bg-stone-100/80 rounded-2xl border border-stone-200 space-y-1.5 text-xs text-stone-600">
+                <div className="flex justify-between">
+                  <span>Subtotal ({totalItens} peças):</span>
+                  <span className="font-semibold text-stone-800">{formatCurrency(valorSubtotal)}</span>
+                </div>
+                {descontoNum > 0 && (
+                  <div className="flex justify-between text-emerald-700 font-semibold">
+                    <span>Desconto Aplicado:</span>
+                    <span>- {formatCurrency(descontoNum)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between items-baseline pt-2 border-t border-stone-200">
+                  <span className="text-sm font-bold text-stone-900">Total a Pagar:</span>
+                  <span className="text-2xl font-bold font-serif text-stone-900 tabular-nums">
+                    {formatCurrency(valorTotal)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Botão Cancelar Venda no final da rolagem */}
+              {carrinho.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setModalCancelarAberto(true)}
+                  className="w-full py-3 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95 shadow-2xs cursor-pointer"
+                >
+                  <Ban className="w-3.5 h-3.5" />
+                  <span>Cancelar Venda / Limpar Carrinho</span>
+                </button>
+              )}
+
+              {/* Spacing padding at bottom of scroll area */}
+              <div className="h-8" />
+            </div>
+
+            {/* FIXED BOTTOM ACTION BAR: Always visible, never cut off! */}
+            <div className="p-3.5 bg-white border-t border-stone-200/90 shadow-2xl flex items-center justify-between gap-3 shrink-0 z-10 pb-safe">
+              <div>
+                <span className="text-[10px] text-stone-400 font-bold uppercase tracking-wider block">
+                  Total da Venda
+                </span>
+                <span className="text-xl font-bold font-serif text-stone-900 tabular-nums">
                   {formatCurrency(valorTotal)}
                 </span>
               </div>
@@ -1409,7 +1831,7 @@ export const NovaVenda: React.FC<NovaVendaProps> = ({
                 type="button"
                 disabled={carrinho.length === 0 || isFinalizando}
                 onClick={handleFinalizarVenda}
-                className={`w-full py-4 rounded-xl font-bold text-sm transition cursor-pointer flex items-center justify-center gap-2 shadow-lg min-h-[52px] active:scale-98 ${
+                className={`flex-1 py-3.5 px-4 rounded-xl font-bold text-sm transition cursor-pointer flex items-center justify-center gap-2 shadow-lg min-h-[48px] active:scale-95 ${
                   carrinho.length === 0 || isFinalizando
                     ? 'bg-stone-200 text-stone-400 cursor-not-allowed shadow-none'
                     : 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-stone-950 shadow-amber-900/20'
@@ -1417,8 +1839,111 @@ export const NovaVenda: React.FC<NovaVendaProps> = ({
               >
                 <CheckCircle2 className="w-5 h-5" />
                 <span>
-                  {isFinalizando ? 'Finalizando...' : `Concluir Venda (${formatCurrency(valorTotal)})`}
+                  {isFinalizando ? 'Finalizando...' : 'Concluir Venda'}
                 </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Confirmação de Cancelamento de Venda */}
+      {modalCancelarAberto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in">
+          <div className="w-full max-w-sm bg-white rounded-3xl shadow-2xl border border-stone-200 p-6 text-center animate-in zoom-in-95">
+            <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mx-auto mb-3 shadow-xs">
+              <Ban className="w-6 h-6" />
+            </div>
+            <h3 className="font-serif text-lg font-bold text-stone-900">
+              Cancelar Venda Atual?
+            </h3>
+            <p className="text-xs text-stone-500 mt-1.5 leading-relaxed">
+              Deseja realmente esvaziar os <strong>{totalItens} {totalItens === 1 ? 'item' : 'itens'}</strong> do carrinho e cancelar esta venda?
+            </p>
+            <div className="mt-5 grid grid-cols-2 gap-2.5">
+              <button
+                type="button"
+                onClick={() => setModalCancelarAberto(false)}
+                className="py-2.5 px-4 rounded-xl border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-semibold text-xs transition cursor-pointer"
+              >
+                Voltar à Venda
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmarCancelarVenda}
+                className="py-2.5 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs transition cursor-pointer shadow-xs active:scale-95"
+              >
+                Sim, Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Peças Compradas na Conta da Cliente (Permite visualização e remoção) */}
+      {modalExtratoClienteAberto && clienteSelecionado && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in">
+          <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl border border-stone-200 overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95">
+            <div className="p-4 bg-stone-900 text-stone-100 flex items-center justify-between">
+              <div>
+                <h3 className="font-serif text-base font-bold text-amber-200">
+                  Peças na Conta de {clienteSelecionado.nome}
+                </h3>
+                <p className="text-xs text-stone-400">
+                  Saldo devedor atual: <strong className="text-white">{formatCurrency(clienteSelecionado.saldoDevedor)}</strong>
+                </p>
+              </div>
+              <button
+                onClick={() => setModalExtratoClienteAberto(false)}
+                className="text-stone-400 hover:text-stone-100 p-1 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-4 flex-1 overflow-y-auto divide-y divide-stone-100 space-y-2">
+              {itensClienteSelecionado.length === 0 ? (
+                <p className="text-xs text-stone-400 text-center py-6">
+                  Nenhuma peça em aberto registrada nesta conta.
+                </p>
+              ) : (
+                itensClienteSelecionado.map(item => (
+                  <div key={item.id} className="pt-2 first:pt-0 flex items-center justify-between gap-3 text-xs">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-bold text-stone-900 truncate">
+                        {item.descricao || 'Item da conta'}
+                      </p>
+                      <p className="text-[10px] text-stone-500">
+                        {formatDate(item.created_at)}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="font-bold text-stone-900 tabular-nums">
+                        {formatCurrency(item.valor)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoverItemContaCliente(item.id, item.descricao)}
+                        className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-[10px] font-bold flex items-center gap-1 transition cursor-pointer active:scale-95 shadow-2xs"
+                        title="Remover esta peça da conta e repor no estoque da loja"
+                      >
+                        <Trash2 className="w-3 h-3 text-rose-600" />
+                        <span>Remover</span>
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="p-3.5 bg-stone-50 border-t border-stone-200 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setModalExtratoClienteAberto(false)}
+                className="px-4 py-2 bg-stone-800 text-white rounded-xl text-xs font-semibold hover:bg-stone-700 transition cursor-pointer"
+              >
+                Fechar
               </button>
             </div>
           </div>

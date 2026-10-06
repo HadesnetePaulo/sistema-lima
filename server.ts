@@ -113,6 +113,8 @@ interface ServerStore {
   vendas: any[];
   caixa: any[];
   fiados: any[];
+  fornecedores: any[];
+  pedidosCompra: any[];
   masterPassword?: string;
   lastUpdated: string;
 }
@@ -128,6 +130,8 @@ function loadDatabase(): ServerStore {
           vendas: Array.isArray(parsed.vendas) ? parsed.vendas : [],
           caixa: Array.isArray(parsed.caixa) ? parsed.caixa : [],
           fiados: Array.isArray(parsed.fiados) ? parsed.fiados : [],
+          fornecedores: Array.isArray(parsed.fornecedores) ? parsed.fornecedores : [],
+          pedidosCompra: Array.isArray(parsed.pedidosCompra) ? parsed.pedidosCompra : [],
           masterPassword: parsed.masterPassword || undefined,
           lastUpdated: parsed.lastUpdated || new Date().toISOString()
         };
@@ -143,6 +147,8 @@ function loadDatabase(): ServerStore {
     vendas: [],
     caixa: [],
     fiados: [],
+    fornecedores: [],
+    pedidosCompra: [],
     masterPassword: '123456',
     lastUpdated: new Date().toISOString()
   };
@@ -177,6 +183,8 @@ app.get('/api/sync', (req, res) => {
     vendas: currentStore.vendas,
     caixa: currentStore.caixa,
     fiados: currentStore.fiados,
+    fornecedores: currentStore.fornecedores || [],
+    pedidosCompra: currentStore.pedidosCompra || [],
     masterPassword: currentStore.masterPassword || '123456'
   });
 });
@@ -184,7 +192,7 @@ app.get('/api/sync', (req, res) => {
 // 2. POST /api/sync - Bidirectional synchronization / merge from any device
 app.post('/api/sync', (req, res) => {
   try {
-    const { produtos, vendas, caixa, fiados, masterPassword } = req.body;
+    const { produtos, vendas, caixa, fiados, fornecedores, pedidosCompra, masterPassword } = req.body;
     let changed = false;
 
     if (Array.isArray(produtos)) {
@@ -203,6 +211,14 @@ app.post('/api/sync', (req, res) => {
       currentStore.fiados = fiados;
       changed = true;
     }
+    if (Array.isArray(fornecedores)) {
+      currentStore.fornecedores = fornecedores;
+      changed = true;
+    }
+    if (Array.isArray(pedidosCompra)) {
+      currentStore.pedidosCompra = pedidosCompra;
+      changed = true;
+    }
     if (masterPassword && typeof masterPassword === 'string' && masterPassword.trim()) {
       currentStore.masterPassword = masterPassword.trim();
       changed = true;
@@ -219,6 +235,8 @@ app.post('/api/sync', (req, res) => {
       vendas: currentStore.vendas,
       caixa: currentStore.caixa,
       fiados: currentStore.fiados,
+      fornecedores: currentStore.fornecedores || [],
+      pedidosCompra: currentStore.pedidosCompra || [],
       masterPassword: currentStore.masterPassword || '123456'
     });
   } catch (err: any) {
@@ -233,6 +251,8 @@ app.post('/api/reset', (req, res) => {
     vendas: [],
     caixa: [],
     fiados: [],
+    fornecedores: [],
+    pedidosCompra: [],
     masterPassword: currentStore.masterPassword || '123456',
     lastUpdated: new Date().toISOString()
   };
@@ -393,6 +413,43 @@ app.post('/api/vendas', (req, res) => {
   }
 });
 
+// DELETE /api/vendas/:id - Cancel sale, restore stock and remove linked fiado
+app.delete('/api/vendas/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const venda = currentStore.vendas.find(v => v.id === id);
+    if (venda) {
+      // Repõe o estoque de cada produto vendido
+      if (Array.isArray(venda.itens)) {
+        for (const item of venda.itens) {
+          const prodId = item.produto_id || (item as any).produto?.id;
+          const prod = currentStore.produtos.find(p => p.id === prodId);
+          if (prod) {
+            prod.quantidade_estoque = Number(prod.quantidade_estoque || 0) + Number(item.quantidade || 1);
+          }
+        }
+      }
+
+      // Se havia lançamento correspondente na conta corrente, remove também
+      currentStore.fiados = currentStore.fiados.filter(f => f.venda_id !== id);
+
+      // Remove a venda
+      currentStore.vendas = currentStore.vendas.filter(v => v.id !== id);
+      saveDatabase(currentStore);
+    }
+
+    res.json({
+      success: true,
+      produtos: currentStore.produtos,
+      vendas: currentStore.vendas,
+      fiados: currentStore.fiados,
+      lastUpdated: currentStore.lastUpdated
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message });
+  }
+});
+
 // 7. POST & DELETE /api/caixa
 app.post('/api/caixa', (req, res) => {
   try {
@@ -456,7 +513,116 @@ app.delete('/api/fiados/:id', (req, res) => {
   }
 });
 
-// 9. Reset catalog endpoint
+// 9. FORNECEDORES API
+app.post('/api/fornecedores', (req, res) => {
+  try {
+    const f = req.body;
+    if (!f || !f.nome) {
+      return res.status(400).json({ success: false, error: 'Nome do fornecedor é obrigatório' });
+    }
+    const index = currentStore.fornecedores.findIndex(item => item.id === f.id);
+    if (index >= 0) {
+      currentStore.fornecedores[index] = {
+        ...currentStore.fornecedores[index],
+        ...f,
+        updated_at: new Date().toISOString()
+      };
+    } else {
+      currentStore.fornecedores.unshift({
+        ...f,
+        id: f.id || 'forn-' + Date.now().toString(36),
+        created_at: f.created_at || new Date().toISOString()
+      });
+    }
+    saveDatabase(currentStore);
+    res.json({ success: true, fornecedores: currentStore.fornecedores, lastUpdated: currentStore.lastUpdated });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message });
+  }
+});
+
+app.delete('/api/fornecedores/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    currentStore.fornecedores = currentStore.fornecedores.filter(f => f.id !== id);
+    saveDatabase(currentStore);
+    res.json({ success: true, lastUpdated: currentStore.lastUpdated });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message });
+  }
+});
+
+// 10. PEDIDOS DE COMPRA API
+app.post('/api/pedidos-compra', (req, res) => {
+  try {
+    const p = req.body;
+    if (!p || !p.fornecedorId || !Array.isArray(p.itens)) {
+      return res.status(400).json({ success: false, error: 'Fornecedor e itens são obrigatórios' });
+    }
+    const index = currentStore.pedidosCompra.findIndex(item => item.id === p.id);
+    if (index >= 0) {
+      currentStore.pedidosCompra[index] = {
+        ...currentStore.pedidosCompra[index],
+        ...p,
+        updated_at: new Date().toISOString()
+      };
+    } else {
+      currentStore.pedidosCompra.unshift({
+        ...p,
+        id: p.id || 'PED-' + Date.now().toString(36).toUpperCase(),
+        created_at: p.created_at || new Date().toISOString()
+      });
+    }
+    saveDatabase(currentStore);
+    res.json({ success: true, pedidosCompra: currentStore.pedidosCompra, lastUpdated: currentStore.lastUpdated });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message });
+  }
+});
+
+app.patch('/api/pedidos-compra/:id/status', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, recebidoPor } = req.body;
+    const pedido = currentStore.pedidosCompra.find(p => p.id === id);
+    if (!pedido) {
+      return res.status(404).json({ success: false, error: 'Pedido não encontrado' });
+    }
+
+    const statusAnterior = pedido.status;
+    pedido.status = status;
+    pedido.updated_at = new Date().toISOString();
+
+    // Quando o pedido muda para "recebido", soma automaticamente ao estoque dos produtos
+    if (status === 'recebido' && statusAnterior !== 'recebido') {
+      pedido.dataRecebimento = new Date().toISOString();
+      pedido.dataConfirmacaoRecebimento = new Date().toISOString();
+      if (recebidoPor) pedido.recebidoPor = recebidoPor;
+
+      if (Array.isArray(pedido.itens)) {
+        for (const item of pedido.itens) {
+          const prod = currentStore.produtos.find(prodItem => prodItem.id === item.produtoId);
+          if (prod) {
+            prod.quantidade_estoque = Number(prod.quantidade_estoque || 0) + Number(item.quantidade || 0);
+          }
+        }
+      }
+    }
+
+    saveDatabase(currentStore);
+    res.json({
+      success: true,
+      pedido,
+      produtos: currentStore.produtos,
+      pedidosCompra: currentStore.pedidosCompra,
+      lastUpdated: currentStore.lastUpdated
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message });
+  }
+});
+
+// 11. Reset catalog endpoint
 app.post('/api/reset-catalog', (req, res) => {
   currentStore.produtos = DEFAULT_PRODUCTS;
   saveDatabase(currentStore);
@@ -493,9 +659,11 @@ async function startServer() {
         let template = fs.readFileSync(indexPath, 'utf-8');
         template = await vite.transformIndexHtml(url, template);
         // Ensure inline suppression script is placed before any @vite/client injection
-        if (template.includes('/@vite/client') && template.includes('// Suppress Vite HMR WebSocket connection errors')) {
-          template = template.replace(/<script type="module" src="\/@vite\/client"><\/script>\s*/i, '');
-          template = template.replace('</script>\n    <meta charset="UTF-8" />', '</script>\n    <script type="module" src="/@vite/client"></script>\n    <meta charset="UTF-8" />');
+        const scriptMatch = template.match(/<script>[\s\S]*?\/\/ Suppress Vite HMR WebSocket[\s\S]*?<\/script>/i);
+        if (scriptMatch) {
+          const scriptContent = scriptMatch[0];
+          template = template.replace(scriptContent, '');
+          template = template.replace(/<head[^>]*>/i, `$&\n    ${scriptContent}`);
         }
         res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
       } catch (e: any) {

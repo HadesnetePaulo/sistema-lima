@@ -21,10 +21,18 @@ import {
   ReceiptText,
   Wallet,
   Users,
-  Trash2
+  Trash2,
+  FileSpreadsheet,
+  Table
 } from 'lucide-react';
 import { storage } from '../lib/storage';
 import { testFirestoreConnection, saveStateToFirestore } from '../lib/firebase';
+import { 
+  exportarEstoqueCSV, 
+  exportarVendasCSV, 
+  exportarItensVendasCSV, 
+  exportarTudoCSV 
+} from '../lib/csvExport';
 import { 
   getStoredSupabaseConfig, 
   saveSupabaseConfig, 
@@ -215,7 +223,7 @@ export const ConfiguracoesSupabase: React.FC<ConfiguracoesSupabaseProps> = ({
       setAlertaBackup({
         tipo: 'sucesso',
         titulo: 'Sincronização Concluída',
-        mensagem: 'Todas as joias, histórico de vendas, fluxo de caixa e fiados estão 100% seguros na nuvem.'
+        mensagem: 'Todas as joias, histórico de vendas, fluxo de caixa e contas correntes estão 100% seguros na nuvem.'
       });
       setTimeout(() => setAlertaBackup(null), 5000);
     } catch (err: any) {
@@ -244,7 +252,7 @@ export const ConfiguracoesSupabase: React.FC<ConfiguracoesSupabaseProps> = ({
       setAlertaBackup({
         tipo: 'sucesso',
         titulo: 'Backup Exportado com Sucesso!',
-        mensagem: `O arquivo "${filename}" foi baixado no seu dispositivo com ${stats.totalProdutos} produtos, ${stats.totalVendas} vendas, ${stats.totalCaixa} lançamentos no caixa e ${stats.totalFiados} registros de fiados.`
+        mensagem: `O arquivo "${filename}" foi baixado no seu dispositivo com ${stats.totalProdutos} produtos, ${stats.totalVendas} vendas, ${stats.totalCaixa} lançamentos no caixa e ${stats.totalFiados} registros de contas correntes.`
       });
       setTimeout(() => setAlertaBackup(null), 6000);
     } catch (err: any) {
@@ -252,6 +260,116 @@ export const ConfiguracoesSupabase: React.FC<ConfiguracoesSupabaseProps> = ({
         tipo: 'erro',
         titulo: 'Erro ao Exportar Backup',
         mensagem: err?.message || 'Não foi possível gerar o arquivo de backup.'
+      });
+    }
+  };
+
+  // CSV Exports (Estoque & Vendas)
+  const handleExportarEstoqueCSV = () => {
+    try {
+      const produtos = storage.getProdutos();
+      if (produtos.length === 0) {
+        setAlertaBackup({
+          tipo: 'info',
+          titulo: 'Estoque Vazio',
+          mensagem: 'Não há semijoias cadastradas no momento para exportar.'
+        });
+        return;
+      }
+      const res = exportarEstoqueCSV(produtos);
+      setAlertaBackup({
+        tipo: 'sucesso',
+        titulo: 'Estoque Exportado com Sucesso (.CSV)!',
+        mensagem: `O arquivo "${res.filename}" com ${res.totalRegistros} itens foi baixado no formato Excel / Planilhas.`
+      });
+      setTimeout(() => setAlertaBackup(null), 6000);
+    } catch (err: any) {
+      setAlertaBackup({
+        tipo: 'erro',
+        titulo: 'Erro ao Exportar Estoque',
+        mensagem: err?.message || 'Falha ao gerar arquivo CSV do estoque.'
+      });
+    }
+  };
+
+  const handleExportarVendasCSV = () => {
+    try {
+      const vendas = storage.getVendas();
+      if (vendas.length === 0) {
+        setAlertaBackup({
+          tipo: 'info',
+          titulo: 'Sem Vendas Registradas',
+          mensagem: 'Ainda não foram registradas vendas no sistema para exportar.'
+        });
+        return;
+      }
+      const res = exportarVendasCSV(vendas);
+      setAlertaBackup({
+        tipo: 'sucesso',
+        titulo: 'Vendas Exportadas com Sucesso (.CSV)!',
+        mensagem: `O arquivo "${res.filename}" com ${res.totalRegistros} vendas foi baixado no formato Excel / Planilhas.`
+      });
+      setTimeout(() => setAlertaBackup(null), 6000);
+    } catch (err: any) {
+      setAlertaBackup({
+        tipo: 'erro',
+        titulo: 'Erro ao Exportar Vendas',
+        mensagem: err?.message || 'Falha ao gerar arquivo CSV das vendas.'
+      });
+    }
+  };
+
+  const handleExportarItensVendasCSV = () => {
+    try {
+      const vendas = storage.getVendas();
+      if (vendas.length === 0) {
+        setAlertaBackup({
+          tipo: 'info',
+          titulo: 'Sem Vendas Registradas',
+          mensagem: 'Ainda não foram registradas vendas no sistema para exportar.'
+        });
+        return;
+      }
+      const res = exportarItensVendasCSV(vendas);
+      setAlertaBackup({
+        tipo: 'sucesso',
+        titulo: 'Itens de Venda Detalhados Exportados (.CSV)!',
+        mensagem: `O arquivo "${res.filename}" com ${res.totalRegistros} itens vendidos foi baixado para auditoria peça a peça.`
+      });
+      setTimeout(() => setAlertaBackup(null), 6000);
+    } catch (err: any) {
+      setAlertaBackup({
+        tipo: 'erro',
+        titulo: 'Erro ao Exportar Itens',
+        mensagem: err?.message || 'Falha ao gerar arquivo CSV dos itens.'
+      });
+    }
+  };
+
+  const handleExportarTudoCSV = () => {
+    try {
+      const produtos = storage.getProdutos();
+      const vendas = storage.getVendas();
+      if (produtos.length === 0 && vendas.length === 0) {
+        setAlertaBackup({
+          tipo: 'info',
+          titulo: 'Sem Dados para Exportar',
+          mensagem: 'Não há produtos ou vendas cadastrados no momento.'
+        });
+        return;
+      }
+      const res = exportarTudoCSV(produtos, vendas);
+      setAlertaBackup({
+        tipo: 'sucesso',
+        titulo: 'Backup Geral em CSV Iniciado!',
+        mensagem: `Foram gerados os arquivos de Estoque (${res.totalProdutos} produtos) e Vendas (${res.totalVendas} vendas). Os downloads foram iniciados no seu dispositivo.`
+      });
+      setTimeout(() => setAlertaBackup(null), 6500);
+    } catch (err: any) {
+      setAlertaBackup({
+        tipo: 'erro',
+        titulo: 'Erro ao Exportar Dados',
+        mensagem: err?.message || 'Falha ao gerar arquivos CSV.'
       });
     }
   };
@@ -307,7 +425,7 @@ export const ConfiguracoesSupabase: React.FC<ConfiguracoesSupabaseProps> = ({
         setAlertaBackup({
           tipo: 'sucesso',
           titulo: 'Backup Restaurado com Sucesso!',
-          mensagem: `Foram restaurados ${res.contagens.produtos} produtos, ${res.contagens.vendas} vendas, ${res.contagens.caixa} registros de caixa e ${res.contagens.fiados} fiados. Os dados foram salvos e sincronizados com a nuvem Firebase.`
+          mensagem: `Foram restaurados ${res.contagens.produtos} produtos, ${res.contagens.vendas} vendas, ${res.contagens.caixa} registros de caixa e ${res.contagens.fiados} contas correntes. Os dados foram salvos e sincronizados com a nuvem Firebase.`
         });
         setTimeout(() => setAlertaBackup(null), 6500);
       } else {
@@ -449,7 +567,7 @@ export const ConfiguracoesSupabase: React.FC<ConfiguracoesSupabaseProps> = ({
       setAlertaBackup({
         tipo: 'sucesso',
         titulo: 'Sistema Zerado com Sucesso',
-        mensagem: 'Todos os produtos, vendas, movimentações de caixa e fiados foram completamente limpos. O sistema está 100% pronto para entrega à cliente.'
+        mensagem: 'Todos os produtos, vendas, movimentações de caixa e contas correntes foram completamente limpos. O sistema está 100% pronto para entrega à cliente.'
       });
       setTimeout(() => setAlertaBackup(null), 6000);
     } catch (err: any) {
@@ -566,7 +684,7 @@ export const ConfiguracoesSupabase: React.FC<ConfiguracoesSupabaseProps> = ({
 
           <div className="flex items-center gap-2 text-xs text-stone-500 bg-white/80 px-3 py-1.5 rounded-xl border border-stone-200">
             <HardDrive className="w-3.5 h-3.5 text-amber-600" />
-            <span>Dados atuais: <strong>{statsAtuais.totalProdutos}</strong> joias, <strong>{statsAtuais.totalVendas}</strong> vendas, <strong>{statsAtuais.totalFiados}</strong> fiados</span>
+            <span>Dados atuais: <strong>{statsAtuais.totalProdutos}</strong> joias, <strong>{statsAtuais.totalVendas}</strong> vendas, <strong>{statsAtuais.totalFiados}</strong> contas correntes</span>
           </div>
         </div>
 
@@ -607,7 +725,7 @@ export const ConfiguracoesSupabase: React.FC<ConfiguracoesSupabaseProps> = ({
               <Users className="w-4 h-4" />
             </div>
             <div>
-              <div className="text-[11px] text-stone-400 uppercase font-semibold">Contas de Fiados</div>
+              <div className="text-[11px] text-stone-400 uppercase font-semibold">Contas Correntes</div>
               <div className="text-sm font-bold text-stone-800">{statsAtuais.totalFiados} lançamentos</div>
             </div>
           </div>
@@ -623,7 +741,7 @@ export const ConfiguracoesSupabase: React.FC<ConfiguracoesSupabaseProps> = ({
                 <span>Exportar Cópia de Segurança (.JSON)</span>
               </div>
               <p className="text-xs text-stone-600 leading-relaxed">
-                Gera um arquivo padronizado contendo 100% dos dados da sua loja (produtos, estoque, preços de custo, vendas realizadas, caixa e caderninho de fiados). Você pode salvar no seu computador, celular ou pendrive.
+                Gera um arquivo padronizado contendo 100% dos dados da sua loja (produtos, estoque, preços de custo, vendas realizadas, caixa e contas correntes de clientes). Você pode salvar no seu computador, celular ou pendrive.
               </p>
             </div>
 
@@ -679,7 +797,7 @@ export const ConfiguracoesSupabase: React.FC<ConfiguracoesSupabaseProps> = ({
                 Persistência Automática em Nuvem Firebase Ativada
               </h4>
               <p className="text-[11px] text-stone-600 mt-0.5">
-                Cada joia cadastrada, venda efetuada, movimentação de caixa ou pagamento de fiado é gravado automaticamente no Google Firebase Firestore. Os dados não são perdidos com reinicializações ou atualizações do sistema.
+                Cada joia cadastrada, venda efetuada, movimentação de caixa ou pagamento de conta corrente é gravado automaticamente no Google Firebase Firestore. Os dados não são perdidos com reinicializações ou atualizações do sistema.
               </p>
             </div>
           </div>
@@ -692,6 +810,129 @@ export const ConfiguracoesSupabase: React.FC<ConfiguracoesSupabaseProps> = ({
             <RefreshCw className={`w-3.5 h-3.5 ${firebaseStatus.loading ? 'animate-spin' : ''}`} />
             <span>{firebaseStatus.loading ? 'Sincronizando...' : 'Sincronizar Nuvem Agora'}</span>
           </button>
+        </div>
+      </div>
+
+      {/* SECTION 2: EXPORTAÇÃO DE DADOS EM CSV (BACKUP LOCAL & PLANILHAS EXCEL) */}
+      <div className="bg-gradient-to-br from-emerald-500/10 via-white to-stone-50 rounded-2xl border-2 border-emerald-300/80 shadow-sm p-6 space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-emerald-200/60">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-800 flex items-center justify-center border border-emerald-400/40 shadow-xs">
+              <FileSpreadsheet className="w-5 h-5 text-emerald-700" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-bold text-stone-900 font-serif">
+                  Exportação de Dados em CSV (Backup Local & Planilhas)
+                </h2>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                  Excel & Google Sheets
+                </span>
+              </div>
+              <p className="text-xs text-stone-600 mt-0.5">
+                Faça o backup local a qualquer momento das suas vendas e estoque em arquivos CSV com pontuação brasileira e codificação UTF-8.
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={handleExportarTudoCSV}
+            className="shrink-0 px-4 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 active:scale-98 text-white font-bold text-xs transition cursor-pointer shadow-sm flex items-center gap-2"
+            title="Baixa automaticamente as planilhas de Estoque e Vendas no seu dispositivo"
+          >
+            <Download className="w-4 h-4" />
+            <span>Baixar Tudo em CSV (Estoque + Vendas)</span>
+          </button>
+        </div>
+
+        {/* Grid com 3 Cards de Exportação */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Card 1: Estoque de Semijoias */}
+          <div className="bg-white rounded-xl border border-stone-200 p-5 flex flex-col justify-between space-y-4 shadow-2xs hover:border-emerald-300 transition">
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-stone-900 flex items-center gap-2">
+                  <Package className="w-4 h-4 text-emerald-600" />
+                  <span>Estoque de Semijoias</span>
+                </span>
+                <span className="px-2 py-0.5 rounded-md bg-stone-100 text-stone-700 text-[10px] font-semibold">
+                  {statsAtuais.totalProdutos} produtos
+                </span>
+              </div>
+              <p className="text-xs text-stone-600 leading-relaxed">
+                Código, referência/código de barras, categoria, saldo em estoque, estoque mínimo, preço de custo, preço de venda, lucro unitário e valor patrimonial em estoque.
+              </p>
+            </div>
+
+            <button
+              onClick={handleExportarEstoqueCSV}
+              className="w-full py-2.5 px-3 rounded-xl bg-stone-900 hover:bg-stone-800 active:scale-98 text-white font-semibold text-xs transition cursor-pointer flex items-center justify-center gap-2 shadow-2xs"
+            >
+              <Download className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Exportar Estoque (.CSV)</span>
+            </button>
+          </div>
+
+          {/* Card 2: Histórico de Vendas Consolidadas */}
+          <div className="bg-white rounded-xl border border-stone-200 p-5 flex flex-col justify-between space-y-4 shadow-2xs hover:border-emerald-300 transition">
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-stone-900 flex items-center gap-2">
+                  <ReceiptText className="w-4 h-4 text-emerald-600" />
+                  <span>Histórico de Vendas</span>
+                </span>
+                <span className="px-2 py-0.5 rounded-md bg-stone-100 text-stone-700 text-[10px] font-semibold">
+                  {statsAtuais.totalVendas} vendas
+                </span>
+              </div>
+              <p className="text-xs text-stone-600 leading-relaxed">
+                Data, hora, cliente, WhatsApp, forma de pagamento, resumo das peças, custo total das joias vendidas, faturamento bruto, lucro líquido apurado e margem.
+              </p>
+            </div>
+
+            <button
+              onClick={handleExportarVendasCSV}
+              className="w-full py-2.5 px-3 rounded-xl bg-stone-900 hover:bg-stone-800 active:scale-98 text-white font-semibold text-xs transition cursor-pointer flex items-center justify-center gap-2 shadow-2xs"
+            >
+              <Download className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Exportar Vendas (.CSV)</span>
+            </button>
+          </div>
+
+          {/* Card 3: Itens Vendidos Detalhados */}
+          <div className="bg-white rounded-xl border border-stone-200 p-5 flex flex-col justify-between space-y-4 shadow-2xs hover:border-emerald-300 transition">
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-stone-900 flex items-center gap-2">
+                  <Table className="w-4 h-4 text-emerald-600" />
+                  <span>Itens Vendidos (Detalhado)</span>
+                </span>
+                <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[10px] font-bold">
+                  Auditoria Peça a Peça
+                </span>
+              </div>
+              <p className="text-xs text-stone-600 leading-relaxed">
+                Relatório minucioso item por item: cada semijoia vendida linha por linha com ID da venda, quantidade, preço unitário de venda, custo unitário e lucro do item.
+              </p>
+            </div>
+
+            <button
+              onClick={handleExportarItensVendasCSV}
+              className="w-full py-2.5 px-3 rounded-xl bg-white border border-stone-300 hover:bg-stone-100 active:scale-98 text-stone-800 font-semibold text-xs transition cursor-pointer flex items-center justify-center gap-2 shadow-2xs"
+            >
+              <Download className="w-3.5 h-3.5 text-stone-600" />
+              <span>Exportar Detalhes (.CSV)</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Dica de Compatibilidade Excel */}
+        <div className="p-3 bg-white/80 rounded-xl border border-emerald-200 text-[11px] text-stone-600 flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+            <span>Formatado com <strong>ponto-e-vírgula (;)</strong> e codificação <strong>UTF-8 com BOM</strong> para abertura direta sem caracteres desconfigurados no Microsoft Excel, LibreOffice e Apple Numbers.</span>
+          </div>
+          <span className="text-stone-400 font-mono text-[10px]">Padrão Brasileiro (R$ 0,00)</span>
         </div>
       </div>
 
@@ -746,7 +987,7 @@ export const ConfiguracoesSupabase: React.FC<ConfiguracoesSupabaseProps> = ({
               <span className="font-mono font-bold text-emerald-900 text-sm">{analiseEntrega.totalVendas}</span>
             </div>
             <p className="text-[11px] text-emerald-800 leading-tight">
-              Histórico financeiro, itens vendidos, caixa e fiados. <strong>100% preservados e blindados.</strong>
+              Histórico financeiro, itens vendidos, caixa e contas correntes. <strong>100% preservados e blindados.</strong>
             </p>
           </div>
 
@@ -922,7 +1163,7 @@ export const ConfiguracoesSupabase: React.FC<ConfiguracoesSupabaseProps> = ({
                   <span className="font-bold text-blue-900">{backupPreview.contagens.caixa}</span>
                 </div>
                 <div className="p-2.5 rounded-lg bg-purple-50/70 border border-purple-200/60 flex items-center justify-between">
-                  <span className="text-stone-600">Fiados / Clientes:</span>
+                  <span className="text-stone-600">Contas Correntes:</span>
                   <span className="font-bold text-purple-900">{backupPreview.contagens.fiados}</span>
                 </div>
               </div>
@@ -1184,7 +1425,7 @@ export const ConfiguracoesSupabase: React.FC<ConfiguracoesSupabaseProps> = ({
               </h3>
             </div>
             <p className="text-xs text-rose-800">
-              Deixa o sistema 100% zerado (produtos, vendas, movimentações de caixa e fiados limpos) pronto para entregar à cliente final.
+              Deixa o sistema 100% zerado (produtos, vendas, movimentações de caixa e contas correntes limpos) pronto para entregar à cliente final.
             </p>
             <button
               type="button"
@@ -1211,7 +1452,7 @@ export const ConfiguracoesSupabase: React.FC<ConfiguracoesSupabaseProps> = ({
                 Zerar Todos os Dados do Sistema?
               </h3>
               <p className="text-xs text-stone-600 leading-relaxed">
-                Esta ação vai limpar <strong>todos os produtos cadastrados</strong>, <strong>histórico de vendas</strong>, <strong>movimentações do caixa</strong> e <strong>contas de fiado</strong>.
+                Esta ação vai limpar <strong>todos os produtos cadastrados</strong>, <strong>histórico de vendas</strong>, <strong>movimentações do caixa</strong> e <strong>contas correntes de clientes</strong>.
               </p>
               <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-amber-900 text-[11px] text-left mt-2">
                 ✓ Use esta opção para entregar o sistema zerado e limpo para sua cliente final cadastrar as joias reais dela e começar as vendas.

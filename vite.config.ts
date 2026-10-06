@@ -3,7 +3,6 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import {defineConfig} from 'vite';
-import {VitePWA} from 'vite-plugin-pwa';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -12,44 +11,20 @@ export default defineConfig(() => {
     plugins: [
       react(),
       tailwindcss(),
-      VitePWA({
-        registerType: 'autoUpdate',
-        includeAssets: ['icon.svg', 'apple-touch-icon.png'],
-        manifest: {
-          id: '/',
-          name: 'Lima Semijoias — Vendas, Estoque & Caixa',
-          short_name: 'Lima Semijoias',
-          description: 'Sistema completo de vendas, estoque, apuração de lucro real e controle de fiados da Lima Semijoias.',
-          theme_color: '#1C1917',
-          background_color: '#FAF8F5',
-          display: 'standalone',
-          start_url: '/',
-          scope: '/',
-          icons: [
-            {
-              src: '/pwa-192x192.png',
-              sizes: '192x192',
-              type: 'image/png',
-              purpose: 'any',
-            },
-            {
-              src: '/pwa-512x512.png',
-              sizes: '512x512',
-              type: 'image/png',
-              purpose: 'any',
-            },
-            {
-              src: '/pwa-maskable-512x512.png',
-              sizes: '512x512',
-              type: 'image/png',
-              purpose: 'maskable',
-            },
-          ],
+      {
+        name: 'silence-hmr',
+        transformIndexHtml: {
+          order: 'post',
+          handler(html) {
+            const match = html.match(/<script>[\s\S]*?\/\/ Suppress Vite HMR WebSocket[\s\S]*?<\/script>/i);
+            if (match) {
+              const script = match[0];
+              return html.replace(script, '').replace(/<head[^>]*>/i, `$&\n    ${script}`);
+            }
+            return html;
+          },
         },
-        devOptions: {
-          enabled: false,
-        },
-      }),
+      },
     ],
     resolve: {
       alias: {

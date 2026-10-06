@@ -1,13 +1,26 @@
+export interface HistoricoPrecoFornecedor {
+  precoCusto: number;
+  dataAtualizacaoPreco: string; // ISO string ou timestamp
+}
+
+export interface FornecedorProdutoRef {
+  fornecedorId: string;
+  precoCusto: number;
+  dataAtualizacaoPreco: string; // ISO string ou timestamp
+  historicoPrecos?: HistoricoPrecoFornecedor[];
+}
+
 export interface Produto {
   id: string;
   nome: string;
   categoria: string;
   codigo_barras: string;
   preco: number;
-  preco_custo?: number; // V2: Preço de custo da semijoia (opcional/padrão 0 nos antigos)
+  preco_custo?: number; // Preço de custo padrão da semijoia
   quantidade_estoque: number;
   estoque_minimo?: number; // Limite mínimo de estoque para alerta visual e selo de atenção (padrão: 3)
   imagem_url?: string;
+  fornecedores?: FornecedorProdutoRef[]; // Vínculo com fornecedores e respectivos preços de custo
   created_at?: string;
 }
 
@@ -63,7 +76,7 @@ export const FORMAS_PAGAMENTO = [
   'Cartão de Débito',
   'Dinheiro',
   'Transferência',
-  'Fiado / A Prazo' // V2: Gera lançamento automático no controle de fiado
+  'Conta Corrente' // Lançamento na conta comercial do cliente
 ] as const;
 
 export type FormaPagamento = typeof FORMAS_PAGAMENTO[number];
@@ -82,7 +95,7 @@ export interface MovimentacaoCaixa {
 }
 
 // -------------------------------------------------------------
-// V2: CONTROLE DE FIADO
+// V2: CONTA CORRENTE (Controle Comercial & Débitos/Pagamentos)
 // -------------------------------------------------------------
 export type TipoLancamentoFiado = 'debito' | 'pagamento';
 
@@ -90,9 +103,11 @@ export interface LancamentoFiado {
   id: string;
   cliente_nome: string;
   cliente_whatsapp?: string;
-  tipo: TipoLancamentoFiado; // 'debito' = compra fiada, 'pagamento' = quando cliente pagou
+  tipo: TipoLancamentoFiado; // 'debito' = compra na conta corrente, 'pagamento' = quando cliente pagou
   valor: number;
   descricao?: string;
+  produto_id?: string;
+  quantidade?: number;
   venda_id?: string;
   created_at: string;
 }
@@ -115,4 +130,51 @@ export interface ContaCliente {
   totalGasto: number;
   ultimaVenda?: string;
 }
+
+// -------------------------------------------------------------
+// V3: MÓDULO DE FORNECEDORES & PEDIDOS DE COMPRA
+// -------------------------------------------------------------
+export interface Fornecedor {
+  id: string;
+  nome: string; // Nome fantasia ou razão social
+  razaoSocial?: string;
+  cnpjOuCpf?: string;
+  telefone?: string;
+  whatsapp?: string;
+  email?: string;
+  prazoMedioEntregaDias?: number;
+  pedidoMinimo?: number;
+  formasPagamento?: string[];
+  observacoes?: string;
+  created_at: string;
+  updated_at?: string;
+}
+
+export type StatusPedidoCompra = 'solicitado' | 'confirmado' | 'em_transito' | 'recebido' | 'cancelado';
+
+export interface ItemPedidoCompra {
+  produtoId: string;
+  nomeProduto: string;
+  quantidade: number;
+  custoUnitario: number;
+  subtotal: number;
+}
+
+export interface PedidoCompra {
+  id: string;
+  fornecedorId: string;
+  fornecedorNome?: string;
+  dataPedido: string;          // ISO string
+  dataPrevistaEntrega: string;  // ISO string
+  dataRecebimento?: string;     // ISO string quando recebido
+  status: StatusPedidoCompra;
+  itens: ItemPedidoCompra[];
+  valorTotal: number;
+  recebidoPor?: string;
+  dataConfirmacaoRecebimento?: string;
+  observacoes?: string;
+  created_at: string;
+  updated_at?: string;
+}
+
 

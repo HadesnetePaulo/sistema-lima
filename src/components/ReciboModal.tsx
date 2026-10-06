@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
 import { Venda } from '../types';
-import { Printer, Check, X, Sparkles, Send, Copy, Phone, MessageSquare, Truck } from 'lucide-react';
+import { storage } from '../lib/storage';
+import { Printer, Check, X, Sparkles, Send, Copy, Phone, MessageSquare, Truck, Ban } from 'lucide-react';
 
 interface ReciboModalProps {
   venda: Venda;
   onClose: () => void;
+  onCancelarVenda?: (venda: Venda) => void;
 }
 
-export const ReciboModal: React.FC<ReciboModalProps> = ({ venda, onClose }) => {
+export const ReciboModal: React.FC<ReciboModalProps> = ({ venda, onClose, onCancelarVenda }) => {
   const [copiado, setCopiado] = useState(false);
   const [telefoneDestino, setTelefoneDestino] = useState(venda.cliente_whatsapp || '');
   const [mostrarCampoTelefone, setMostrarCampoTelefone] = useState(false);
@@ -172,11 +174,11 @@ export const ReciboModal: React.FC<ReciboModalProps> = ({ venda, onClose }) => {
         <div className="p-6 bg-white text-stone-900 font-sans print-only-container overflow-y-auto flex-1 space-y-4">
           {/* Header with Official Logo */}
           <div className="text-center pb-4 border-b border-dashed border-stone-300 flex flex-col items-center">
-            <div className="w-16 h-16 rounded-2xl overflow-hidden bg-stone-950 border border-amber-300/40 p-0.5 shadow-md mb-2">
+            <div className="w-20 h-16 rounded-xl overflow-hidden bg-white border border-stone-200 p-1 shadow-xs mb-2 flex items-center justify-center">
               <img
                 src="/logo-lima.jpg"
                 alt="Lima Semijoias"
-                className="w-full h-full object-cover rounded-[14px]"
+                className="w-full h-full object-contain"
               />
             </div>
             <h2 className="font-serif text-2xl font-bold tracking-widest text-stone-900">
@@ -296,12 +298,30 @@ export const ReciboModal: React.FC<ReciboModalProps> = ({ venda, onClose }) => {
             </button>
           </div>
 
-          <button
-            onClick={onClose}
-            className="py-2 px-4 text-xs font-semibold text-stone-700 hover:text-stone-950 bg-stone-200 hover:bg-stone-300 rounded-xl transition cursor-pointer"
-          >
-            Fechar
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={async () => {
+                if (confirm(`Deseja cancelar a venda #${venda.id}? As peças vendidas serão devolvidas ao estoque e o lançamento será estornado.`)) {
+                  await storage.cancelarVenda(venda.id, true);
+                  onClose();
+                  onCancelarVenda?.(venda);
+                }
+              }}
+              className="py-2 px-3 text-xs font-semibold text-rose-700 hover:text-rose-900 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl transition cursor-pointer flex items-center gap-1"
+              title="Cancelar esta venda e devolver peças ao estoque"
+            >
+              <Ban className="w-3.5 h-3.5" />
+              <span>Cancelar Venda</span>
+            </button>
+
+            <button
+              onClick={onClose}
+              className="py-2 px-4 text-xs font-semibold text-stone-700 hover:text-stone-950 bg-stone-200 hover:bg-stone-300 rounded-xl transition cursor-pointer"
+            >
+              Fechar
+            </button>
+          </div>
         </div>
       </div>
     </div>

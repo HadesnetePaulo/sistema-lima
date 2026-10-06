@@ -9,14 +9,42 @@
           var OrigWebSocket = window.WebSocket;
           if (OrigWebSocket) {
             window.WebSocket = function(url, protocols) {
-              if (protocols === 'vite-hmr' || (typeof url === 'string' && (url.indexOf('vite') !== -1 || url.indexOf('hmr') !== -1))) {
-                return {
-                  addEventListener: function() {},
+              var sUrl = String(url || '');
+              var sProto = String(protocols || '');
+              if (
+                sProto.indexOf('vite') !== -1 ||
+                sUrl.indexOf('vite') !== -1 ||
+                sUrl.indexOf('hmr') !== -1 ||
+                sUrl.indexOf('5173') !== -1 ||
+                sUrl.indexOf('3000') !== -1
+              ) {
+                var dummy = {
+                  url: sUrl,
+                  protocol: sProto,
+                  readyState: 1,
+                  bufferedAmount: 0,
+                  extensions: '',
+                  binaryType: 'blob',
+                  onopen: null,
+                  onclose: null,
+                  onerror: null,
+                  onmessage: null,
+                  addEventListener: function(type, listener) {
+                    if (type === 'open') {
+                      setTimeout(function() {
+                        try { listener({ type: 'open' }); } catch(e) {}
+                      }, 0);
+                    }
+                  },
                   removeEventListener: function() {},
+                  dispatchEvent: function() { return true; },
                   send: function() {},
-                  close: function() {},
-                  readyState: 3
+                  close: function() { dummy.readyState = 3; }
                 };
+                setTimeout(function() {
+                  try { if (dummy.onopen) dummy.onopen({ type: 'open' }); } catch(e) {}
+                }, 0);
+                return dummy;
               }
               return new OrigWebSocket(url, protocols);
             };
@@ -32,7 +60,8 @@
                 item.indexOf('vite:') !== -1 ||
                 item.indexOf('WebSocket') !== -1 ||
                 item.indexOf('websocket') !== -1 ||
-                item.indexOf('HMR') !== -1
+                item.indexOf('HMR') !== -1 ||
+                item.indexOf('hmr') !== -1
               ) {
                 return true;
               }
@@ -80,9 +109,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Lima Semijoias — Sistema de Vendas & Estoque</title>
-    <meta name="description" content="Sistema simples e elegante de vendas, controle de estoque, fluxo de caixa, fiados e emissão de recibos para Lima Semijoias." />
+    <meta name="description" content="Sistema simples e elegante de vendas, controle de estoque, fluxo de caixa, conta corrente de clientes e emissão de recibos para Lima Semijoias." />
     <meta property="og:title" content="Lima Semijoias — Sistema de Vendas & Estoque" />
-    <meta property="og:description" content="Sistema simples e elegante de vendas, controle de estoque, fluxo de caixa, fiados e emissão de recibos para Lima Semijoias." />
+    <meta property="og:description" content="Sistema simples e elegante de vendas, controle de estoque, fluxo de caixa, conta corrente de clientes e emissão de recibos para Lima Semijoias." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
 

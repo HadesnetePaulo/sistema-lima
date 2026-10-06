@@ -1,6 +1,6 @@
 {
   "name": "Lima Semijoias — Sistema de Vendas & Estoque",
-  "description": "Sistema simples e elegante de vendas, controle de estoque, fluxo de caixa, fiados e emissão de recibos para Lima Semijoias.",
+  "description": "Sistema simples e elegante de vendas, controle de estoque, fluxo de caixa, conta corrente de clientes e emissão de recibos para Lima Semijoias.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

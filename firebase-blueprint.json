@@ -11,13 +11,56 @@
         "codigo_barras": { "type": "string" },
         "preco": { "type": "number" },
         "preco_custo": { "type": "number" },
-        "quantidade": { "type": "number" },
-        "quantidade_minima": { "type": "number" },
-        "imagem": { "type": "string" },
+        "quantidade_estoque": { "type": "number" },
+        "estoque_minimo": { "type": "number" },
+        "imagem_url": { "type": "string" },
+        "fornecedores": { "type": "array" },
         "created_at": { "type": "string" },
         "updated_at": { "type": "string" }
       },
-      "required": ["id", "nome", "categoria", "preco", "quantidade"]
+      "required": ["id", "nome", "categoria", "preco", "quantidade_estoque"]
+    },
+    "Fornecedor": {
+      "title": "Fornecedor",
+      "description": "Cadastro de fornecedor ou fabricante parceiro de semijoias",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "nome": { "type": "string" },
+        "razaoSocial": { "type": "string" },
+        "cnpjOuCpf": { "type": "string" },
+        "telefone": { "type": "string" },
+        "whatsapp": { "type": "string" },
+        "email": { "type": "string" },
+        "prazoMedioEntregaDias": { "type": "number" },
+        "pedidoMinimo": { "type": "number" },
+        "formasPagamento": { "type": "array" },
+        "observacoes": { "type": "string" },
+        "created_at": { "type": "string" },
+        "updated_at": { "type": "string" }
+      },
+      "required": ["id", "nome"]
+    },
+    "PedidoCompra": {
+      "title": "PedidoCompra",
+      "description": "Registro de pedido de compra de semijoias junto a fornecedor",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "fornecedorId": { "type": "string" },
+        "fornecedorNome": { "type": "string" },
+        "dataPedido": { "type": "string" },
+        "dataPrevistaEntrega": { "type": "string" },
+        "dataRecebimento": { "type": "string" },
+        "status": { "type": "string" },
+        "itens": { "type": "array" },
+        "valorTotal": { "type": "number" },
+        "recebidoPor": { "type": "string" },
+        "dataConfirmacaoRecebimento": { "type": "string" },
+        "observacoes": { "type": "string" },
+        "created_at": { "type": "string" }
+      },
+      "required": ["id", "fornecedorId", "dataPedido", "status", "valorTotal"]
     },
     "Venda": {
       "title": "Venda",
@@ -83,6 +126,14 @@
     }
   },
   "firestore": {
+    "/fornecedores/{fornecedorId}": {
+      "schema": { "$ref": "entities/Fornecedor" },
+      "description": "Coleção de fornecedores e parceiros"
+    },
+    "/pedidosCompra/{pedidoId}": {
+      "schema": { "$ref": "entities/PedidoCompra" },
+      "description": "Coleção de pedidos de compra junto a fornecedores"
+    },
     "/produtos/{produtoId}": {
       "schema": { "$ref": "entities/Produto" },
       "description": "Coleção de produtos e estoque"

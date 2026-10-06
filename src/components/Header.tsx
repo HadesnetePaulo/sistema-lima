@@ -9,11 +9,12 @@ import {
   Database, 
   LogOut,
   MoreHorizontal,
-  X
+  X,
+  Truck
 } from 'lucide-react';
 import { PWAInstallButton } from './PWAInstallButton';
 
-export type TabType = 'pdv' | 'produtos' | 'vendas' | 'caixa' | 'relatorios' | 'fiado' | 'config';
+export type TabType = 'pdv' | 'produtos' | 'fornecedores' | 'vendas' | 'caixa' | 'relatorios' | 'fiado' | 'config';
 
 interface HeaderProps {
   activeTab: TabType;
@@ -45,11 +46,11 @@ export const Header: React.FC<HeaderProps> = ({
           onClick={() => setActiveTab('pdv')}
           className="text-left group cursor-pointer focus:outline-none flex items-center gap-2.5 sm:gap-3"
         >
-          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl overflow-hidden bg-stone-950 border border-amber-400/40 p-0.5 shadow-sm group-hover:border-amber-300 transition shrink-0">
+          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl overflow-hidden bg-white border border-amber-400/40 p-1 shadow-sm group-hover:border-amber-300 transition shrink-0 flex items-center justify-center">
             <img
               src="/logo-lima.jpg"
               alt="Logo Lima Semijoias"
-              className="w-full h-full object-cover rounded-[10px]"
+              className="w-full h-full object-contain"
             />
           </div>
           <div className="flex flex-col">
@@ -94,6 +95,18 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
 
           <button
+            onClick={() => setActiveTab('fornecedores')}
+            className={`px-3 py-2 rounded-xl text-xs xl:text-sm font-semibold transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+              activeTab === 'fornecedores'
+                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-xs'
+                : 'text-stone-400 hover:text-stone-100 hover:bg-stone-800/70'
+            }`}
+          >
+            <Truck className="w-4 h-4 text-amber-400" />
+            <span>Fornecedores</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('caixa')}
             className={`px-3 py-2 rounded-xl text-xs xl:text-sm font-semibold transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
               activeTab === 'caixa'
@@ -114,7 +127,7 @@ export const Header: React.FC<HeaderProps> = ({
             }`}
           >
             <Users className="w-4 h-4 text-amber-400" />
-            <span>Fiados</span>
+            <span>Conta Corrente</span>
           </button>
 
           <button
@@ -245,7 +258,7 @@ export const Header: React.FC<HeaderProps> = ({
           }`}
         >
           <Users className={`w-5 h-5 transition-transform ${activeTab === 'fiado' ? 'scale-110 text-amber-400' : ''}`} />
-          <span className="mt-1 text-[11px] tracking-tight">Fiados</span>
+          <span className="mt-1 text-[11px] tracking-tight">C. Corrente</span>
           {activeTab === 'fiado' && (
             <span className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-0.5" />
           )}
@@ -254,12 +267,12 @@ export const Header: React.FC<HeaderProps> = ({
         <button
           onClick={() => setMobileMenuAberto(true)}
           className={`flex-1 h-full flex flex-col items-center justify-center transition-all cursor-pointer select-none active:scale-95 ${
-            ['vendas', 'relatorios', 'config'].includes(activeTab) ? 'text-amber-400 font-bold' : 'text-stone-400 hover:text-stone-300'
+            ['vendas', 'relatorios', 'config', 'fornecedores'].includes(activeTab) ? 'text-amber-400 font-bold' : 'text-stone-400 hover:text-stone-300'
           }`}
         >
-          <MoreHorizontal className={`w-5 h-5 transition-transform ${['vendas', 'relatorios', 'config'].includes(activeTab) ? 'scale-110 text-amber-400' : ''}`} />
+          <MoreHorizontal className={`w-5 h-5 transition-transform ${['vendas', 'relatorios', 'config', 'fornecedores'].includes(activeTab) ? 'scale-110 text-amber-400' : ''}`} />
           <span className="mt-1 text-[11px] tracking-tight">Mais</span>
-          {['vendas', 'relatorios', 'config'].includes(activeTab) && (
+          {['vendas', 'relatorios', 'config', 'fornecedores'].includes(activeTab) && (
             <span className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-0.5" />
           )}
         </button>
@@ -283,6 +296,18 @@ export const Header: React.FC<HeaderProps> = ({
 
             <div className="grid grid-cols-2 gap-2 pt-1">
               <button
+                onClick={() => handleSelectTab('fornecedores')}
+                className={`p-3 rounded-xl flex items-center gap-2.5 text-xs font-semibold border transition ${
+                  activeTab === 'fornecedores'
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                    : 'bg-stone-800/80 text-stone-200 border-stone-700'
+                }`}
+              >
+                <Truck className="w-4 h-4 text-amber-400" />
+                <span>Fornecedores</span>
+              </button>
+
+              <button
                 onClick={() => handleSelectTab('relatorios')}
                 className={`p-3 rounded-xl flex items-center gap-2.5 text-xs font-semibold border transition ${
                   activeTab === 'relatorios'
@@ -296,7 +321,7 @@ export const Header: React.FC<HeaderProps> = ({
 
               <button
                 onClick={() => handleSelectTab('vendas')}
-                className={`p-3 rounded-xl flex items-center gap-2.5 text-xs font-semibold border transition ${
+                className={`col-span-2 p-3 rounded-xl flex items-center gap-2.5 text-xs font-semibold border transition ${
                   activeTab === 'vendas'
                     ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
                     : 'bg-stone-800/80 text-stone-200 border-stone-700'

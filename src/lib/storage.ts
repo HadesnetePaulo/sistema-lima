@@ -1,4 +1,16 @@
-import { Produto, Venda, CartItem, MovimentacaoCaixa, LancamentoFiado, ResumoClienteFiado, ContaCliente } from '../types';
+import { 
+  Produto, 
+  Venda, 
+  CartItem, 
+  MovimentacaoCaixa, 
+  LancamentoFiado, 
+  ResumoClienteFiado, 
+  ContaCliente,
+  Fornecedor,
+  PedidoCompra,
+  StatusPedidoCompra,
+  FornecedorProdutoRef
+} from '../types';
 import { safeLocalStorage, safeSessionStorage } from './safeStorage';
 import {
   fetchStateFromFirestore,
@@ -96,6 +108,8 @@ const STORAGE_KEY_PRODUTOS = 'lima_semijoias_produtos_v1';
 const STORAGE_KEY_VENDAS = 'lima_semijoias_vendas_v1';
 const STORAGE_KEY_CAIXA = 'lima_semijoias_caixa_v2';
 const STORAGE_KEY_FIADOS = 'lima_semijoias_fiados_v2';
+const STORAGE_KEY_FORNECEDORES = 'lima_semijoias_fornecedores_v3';
+const STORAGE_KEY_PEDIDOS_COMPRA = 'lima_semijoias_pedidos_compra_v3';
 const STORAGE_KEY_AUTH = 'lima_semijoias_auth_v2';
 const STORAGE_KEY_CUSTOM_PASSWORD = 'lima_semijoias_custom_password_v1';
 const DEFAULT_PASSWORD = '123456';
@@ -141,10 +155,12 @@ export const storage = {
     const vendas = this.getVendas();
     const caixa = this.getMovimentacoesCaixa();
     const fiados = this.getFiados();
+    const fornecedores = this.getFornecedores();
+    const pedidosCompra = this.getPedidosCompra();
     const masterPassword = this.getMasterPassword();
 
     // 1. Firebase Firestore (nuvem permanente definitiva em tempo real)
-    await saveStateToFirestore({ produtos, vendas, caixa, fiados });
+    await saveStateToFirestore({ produtos, vendas, caixa, fiados, fornecedores, pedidosCompra });
 
     // 2. Servidor central (/api/sync)
     callServerApi('/api/sync', {
@@ -154,6 +170,8 @@ export const storage = {
         vendas,
         caixa,
         fiados,
+        fornecedores,
+        pedidosCompra,
         masterPassword
       })
     }).catch(() => {});
@@ -168,12 +186,28 @@ export const storage = {
     vendas?: Venda[];
     caixa?: MovimentacaoCaixa[];
     fiados?: LancamentoFiado[];
+    fornecedores?: Fornecedor[];
+    pedidosCompra?: PedidoCompra[];
     masterPassword?: string;
   }): void {
-    safeLocalStorage.setItem(STORAGE_KEY_PRODUTOS, JSON.stringify(cloudState.produtos || []));
-    safeLocalStorage.setItem(STORAGE_KEY_VENDAS, JSON.stringify(cloudState.vendas || []));
-    safeLocalStorage.setItem(STORAGE_KEY_CAIXA, JSON.stringify(cloudState.caixa || []));
-    safeLocalStorage.setItem(STORAGE_KEY_FIADOS, JSON.stringify(cloudState.fiados || []));
+    if (cloudState.produtos !== undefined) {
+      safeLocalStorage.setItem(STORAGE_KEY_PRODUTOS, JSON.stringify(cloudState.produtos || []));
+    }
+    if (cloudState.vendas !== undefined) {
+      safeLocalStorage.setItem(STORAGE_KEY_VENDAS, JSON.stringify(cloudState.vendas || []));
+    }
+    if (cloudState.caixa !== undefined) {
+      safeLocalStorage.setItem(STORAGE_KEY_CAIXA, JSON.stringify(cloudState.caixa || []));
+    }
+    if (cloudState.fiados !== undefined) {
+      safeLocalStorage.setItem(STORAGE_KEY_FIADOS, JSON.stringify(cloudState.fiados || []));
+    }
+    if (cloudState.fornecedores !== undefined) {
+      safeLocalStorage.setItem(STORAGE_KEY_FORNECEDORES, JSON.stringify(cloudState.fornecedores || []));
+    }
+    if (cloudState.pedidosCompra !== undefined) {
+      safeLocalStorage.setItem(STORAGE_KEY_PEDIDOS_COMPRA, JSON.stringify(cloudState.pedidosCompra || []));
+    }
     if (cloudState.masterPassword) {
       safeLocalStorage.setItem(STORAGE_KEY_CUSTOM_PASSWORD, cloudState.masterPassword);
     }
@@ -184,6 +218,8 @@ export const storage = {
     vendas: Venda[];
     caixa: MovimentacaoCaixa[];
     fiados: LancamentoFiado[];
+    fornecedores: Fornecedor[];
+    pedidosCompra: PedidoCompra[];
     masterPassword?: string;
     fromFirebase?: boolean;
   } | null> {
@@ -195,12 +231,16 @@ export const storage = {
         const vendas = firestoreData.vendas || [];
         const caixa = firestoreData.caixa || [];
         const fiados = firestoreData.fiados || [];
+        const fornecedores = firestoreData.fornecedores || [];
+        const pedidosCompra = firestoreData.pedidosCompra || [];
 
         this.atualizarEstadoLocal({
           produtos,
           vendas,
           caixa,
-          fiados
+          fiados,
+          fornecedores,
+          pedidosCompra
         });
 
         // Replica para servidor local se necessário
@@ -211,6 +251,8 @@ export const storage = {
             vendas,
             caixa,
             fiados,
+            fornecedores,
+            pedidosCompra,
             masterPassword: this.getMasterPassword()
           })
         }).catch(() => {});
@@ -220,6 +262,8 @@ export const storage = {
           vendas,
           caixa,
           fiados,
+          fornecedores,
+          pedidosCompra,
           masterPassword: this.getMasterPassword(),
           fromFirebase: true
         };
@@ -235,6 +279,8 @@ export const storage = {
       vendas: Venda[];
       caixa: MovimentacaoCaixa[];
       fiados: LancamentoFiado[];
+      fornecedores?: Fornecedor[];
+      pedidosCompra?: PedidoCompra[];
       masterPassword?: string;
     }>('/api/sync');
 
@@ -243,12 +289,16 @@ export const storage = {
       const vendas = data.vendas || [];
       const caixa = data.caixa || [];
       const fiados = data.fiados || [];
+      const fornecedores = data.fornecedores || [];
+      const pedidosCompra = data.pedidosCompra || [];
 
       this.atualizarEstadoLocal({
         produtos,
         vendas,
         caixa,
         fiados,
+        fornecedores,
+        pedidosCompra,
         masterPassword: data.masterPassword
       });
 
@@ -257,6 +307,8 @@ export const storage = {
         vendas,
         caixa,
         fiados,
+        fornecedores,
+        pedidosCompra,
         masterPassword: data.masterPassword,
         fromFirebase: false
       };
@@ -627,19 +679,76 @@ export const storage = {
       })
     }).catch(() => {});
 
-    // V2: Se for compra Fiada, cria débito automático no controle de fiado local
-    if (formaPagamento.toLowerCase().includes('fiado') && clienteNome?.trim()) {
+    // V2: Se for compra na Conta Corrente (ou fiado), cria débito automático no controle comercial
+    if ((formaPagamento.toLowerCase().includes('corrente') || formaPagamento.toLowerCase().includes('fiado')) && clienteNome?.trim()) {
+      const descricaoItens = itens.map(i => `${i.quantidade}x ${i.produto.nome}`).join(', ');
       this.addLancamentoFiado({
         cliente_nome: clienteNome.trim(),
         cliente_whatsapp: clienteWhatsapp?.trim(),
         tipo: 'debito',
         valor: novaVenda.total,
-        descricao: `Compra a prazo #${novaVenda.id}`,
+        descricao: `Pedido #${novaVenda.id}: ${descricaoItens}`,
         venda_id: novaVenda.id,
       });
     }
 
     return novaVenda;
+  },
+
+  /**
+   * CANCELAR VENDA / ESTORNO ATÔMICO
+   * 1. Repõe o estoque de cada semijoia que foi vendida.
+   * 2. Se a venda foi em Conta Corrente, remove o lançamento de débito do cliente.
+   * 3. Remove a venda do histórico e sincroniza tudo com a nuvem Firebase e servidor central.
+   */
+  async cancelarVenda(vendaId: string, reporEstoque: boolean = true): Promise<boolean> {
+    const vendas = this.getVendas();
+    const venda = vendas.find(v => v.id === vendaId);
+    if (!venda) return false;
+
+    // 1. Reposição de estoque
+    if (reporEstoque && Array.isArray(venda.itens)) {
+      for (const item of venda.itens) {
+        if (item.produto_id && item.quantidade > 0) {
+          try {
+            await this.ajustarEstoque(item.produto_id, item.quantidade);
+          } catch (err) {
+            console.warn(`Aviso ao repor estoque ao cancelar venda (${item.produto_id}):`, err);
+          }
+        }
+      }
+    }
+
+    // 2. Se a venda foi lançada na Conta Corrente, cancela o débito correspondente
+    if (venda.forma_pagamento.toLowerCase().includes('corrente') || venda.forma_pagamento.toLowerCase().includes('fiado')) {
+      const fiados = this.getFiados();
+      const fiadosRestantes = fiados.filter(f => f.venda_id !== venda.id && !(f.descricao && f.descricao.includes(venda.id)));
+      if (fiadosRestantes.length !== fiados.length) {
+        this.saveFiados(fiadosRestantes);
+      }
+    }
+
+    // 3. Remove a venda local
+    const novasVendas = vendas.filter(v => v.id !== vendaId);
+    this.saveVendas(novasVendas);
+
+    // 4. Supabase
+    const client = getSupabaseClient();
+    if (client) {
+      try {
+        await client.from('vendas').delete().eq('id', vendaId);
+      } catch (err) {
+        console.warn('Aviso ao deletar venda no Supabase:', err);
+      }
+    }
+
+    // 5. Servidor local & Nuvem Firebase Firestore
+    callServerApi(`/api/vendas/${vendaId}`, {
+      method: 'DELETE'
+    }).catch(() => {});
+
+    await this.persistirEmTodasNuvens().catch(() => {});
+    return true;
   },
 
   // -------------------------------------------------------------
@@ -779,7 +888,86 @@ export const storage = {
     return novoLancamento;
   },
 
-  async deleteLancamentoFiado(id: string): Promise<void> {
+  /**
+   * Acrescenta uma nova peça ou débito avulso diretamente na Conta Corrente do cliente.
+   * Se for selecionado um produto do catálogo, dá baixa automática no estoque!
+   */
+  async acrescentarContaCorrente(dados: {
+    cliente_nome: string;
+    cliente_whatsapp?: string;
+    descricao: string;
+    valor: number;
+    produto_id?: string;
+    quantidade?: number;
+  }): Promise<LancamentoFiado> {
+    // 1. Se for produto com estoque, dá baixa no estoque do catálogo
+    if (dados.produto_id && dados.quantidade && dados.quantidade > 0) {
+      try {
+        await this.ajustarEstoque(dados.produto_id, -dados.quantidade);
+      } catch (err) {
+        console.warn('Aviso ao ajustar estoque ao acrescentar na conta corrente:', err);
+      }
+    }
+
+    // 2. Registra o débito na conta corrente
+    return await this.addLancamentoFiado({
+      cliente_nome: dados.cliente_nome.trim(),
+      cliente_whatsapp: dados.cliente_whatsapp?.trim(),
+      tipo: 'debito',
+      valor: dados.valor,
+      descricao: dados.descricao.trim(),
+      produto_id: dados.produto_id,
+      quantidade: dados.quantidade,
+    });
+  },
+
+  /**
+   * Remove uma peça ou abate um valor da Conta Corrente do cliente (devolução, estorno ou item cancelado).
+   * Se for selecionado um produto e devolverAoEstoque for true (padrão), devolve as peças automaticamente ao estoque!
+   */
+  async removerItemContaCorrente(dados: {
+    cliente_nome: string;
+    cliente_whatsapp?: string;
+    descricao: string;
+    valor: number;
+    produto_id?: string;
+    quantidade?: number;
+    devolverAoEstoque?: boolean;
+  }): Promise<LancamentoFiado> {
+    // 1. Se for produto com estoque e deve repor, adiciona de volta ao catálogo
+    if (dados.produto_id && dados.quantidade && dados.quantidade > 0 && dados.devolverAoEstoque !== false) {
+      try {
+        await this.ajustarEstoque(dados.produto_id, dados.quantidade);
+      } catch (err) {
+        console.warn('Aviso ao devolver estoque ao remover da conta corrente:', err);
+      }
+    }
+
+    // 2. Registra o abatimento na conta corrente (tipo 'pagamento' sem registrar no caixa, pois é estorno/devolução)
+    return await this.addLancamentoFiado({
+      cliente_nome: dados.cliente_nome.trim(),
+      cliente_whatsapp: dados.cliente_whatsapp?.trim(),
+      tipo: 'pagamento',
+      valor: dados.valor,
+      descricao: dados.descricao.startsWith('Devolução') ? dados.descricao.trim() : `Devolução / Remoção: ${dados.descricao.trim()}`,
+      produto_id: dados.produto_id,
+      quantidade: dados.quantidade,
+    });
+  },
+
+  async deleteLancamentoFiado(id: string, reporEstoque: boolean = true): Promise<void> {
+    const fiados = this.getFiados();
+    const item = fiados.find(f => f.id === id);
+
+    // Se estiver excluindo um débito que tinha produto e optou por repor estoque
+    if (item && reporEstoque && item.tipo === 'debito' && item.produto_id && item.quantidade && item.quantidade > 0) {
+      try {
+        await this.ajustarEstoque(item.produto_id, item.quantidade);
+      } catch (err) {
+        console.warn('Aviso ao repor estoque ao excluir lançamento:', err);
+      }
+    }
+
     const client = getSupabaseClient();
     if (client) {
       try {
@@ -789,8 +977,8 @@ export const storage = {
       }
     }
 
-    const fiados = this.getFiados().filter(f => f.id !== id);
-    this.saveFiados(fiados);
+    const novosFiados = fiados.filter(f => f.id !== id);
+    this.saveFiados(novosFiados);
 
     // Persist deletion to central server
     callServerApi(`/api/fiados/${id}`, {
@@ -906,6 +1094,256 @@ export const storage = {
   },
 
   // -------------------------------------------------------------
+  // V3: FORNECEDORES
+  // -------------------------------------------------------------
+  getFornecedores(): Fornecedor[] {
+    try {
+      const data = safeLocalStorage.getItem(STORAGE_KEY_FORNECEDORES);
+      return data ? JSON.parse(data) : [];
+    } catch {
+      return [];
+    }
+  },
+
+  saveFornecedores(fornecedores: Fornecedor[]): void {
+    safeLocalStorage.setItem(STORAGE_KEY_FORNECEDORES, JSON.stringify(fornecedores));
+    this.persistirEmTodasNuvens().catch(() => {});
+  },
+
+  async addFornecedor(fornecedorData: Omit<Fornecedor, 'id' | 'created_at'>): Promise<Fornecedor> {
+    const novoFornecedor: Fornecedor = {
+      ...fornecedorData,
+      id: 'forn-' + Date.now().toString(36) + Math.random().toString(36).substring(2, 5),
+      created_at: new Date().toISOString()
+    };
+
+    const fornecedores = this.getFornecedores();
+    fornecedores.unshift(novoFornecedor);
+    this.saveFornecedores(fornecedores);
+
+    // Persist to server
+    callServerApi('/api/fornecedores', {
+      method: 'POST',
+      body: JSON.stringify(novoFornecedor)
+    }).catch(() => {});
+
+    return novoFornecedor;
+  },
+
+  async updateFornecedor(id: string, fornecedorData: Partial<Fornecedor>): Promise<Fornecedor> {
+    const fornecedores = this.getFornecedores();
+    const index = fornecedores.findIndex(f => f.id === id);
+    if (index === -1) throw new Error('Fornecedor não encontrado');
+
+    fornecedores[index] = {
+      ...fornecedores[index],
+      ...fornecedorData,
+      updated_at: new Date().toISOString()
+    };
+    this.saveFornecedores(fornecedores);
+
+    // Persist to server
+    callServerApi('/api/fornecedores', {
+      method: 'POST',
+      body: JSON.stringify(fornecedores[index])
+    }).catch(() => {});
+
+    return fornecedores[index];
+  },
+
+  async deleteFornecedor(id: string): Promise<void> {
+    const fornecedores = this.getFornecedores().filter(f => f.id !== id);
+    this.saveFornecedores(fornecedores);
+
+    // Persist to server
+    callServerApi(`/api/fornecedores/${id}`, {
+      method: 'DELETE'
+    }).catch(() => {});
+  },
+
+  // -------------------------------------------------------------
+  // V3: VÍNCULO FORNECEDOR <-> PRODUTO COM HISTÓRICO DE PREÇOS
+  // -------------------------------------------------------------
+  async vincularOuAtualizarFornecedorNoProduto(
+    produtoId: string,
+    fornecedorId: string,
+    novoPrecoCusto: number
+  ): Promise<Produto> {
+    const produtos = this.getProdutos();
+    const index = produtos.findIndex(p => p.id === produtoId);
+    if (index === -1) throw new Error('Produto não encontrado');
+
+    const prod = { ...produtos[index] };
+    const listaFornecedores: FornecedorProdutoRef[] = Array.isArray(prod.fornecedores)
+      ? prod.fornecedores.map(f => ({
+          ...f,
+          historicoPrecos: Array.isArray(f.historicoPrecos) ? [...f.historicoPrecos] : []
+        }))
+      : [];
+
+    const fornIndex = listaFornecedores.findIndex(f => f.fornecedorId === fornecedorId);
+    const dataHoraIso = new Date().toISOString();
+
+    if (fornIndex >= 0) {
+      const atual = listaFornecedores[fornIndex];
+      // Se o preço de custo mudou, move o valor antigo para o histórico antes de sobrescrever
+      if (Number(atual.precoCusto) !== Number(novoPrecoCusto)) {
+        const historico = Array.isArray(atual.historicoPrecos) ? [...atual.historicoPrecos] : [];
+        historico.unshift({
+          precoCusto: Number(atual.precoCusto),
+          dataAtualizacaoPreco: atual.dataAtualizacaoPreco || dataHoraIso
+        });
+        listaFornecedores[fornIndex] = {
+          ...atual,
+          precoCusto: Number(novoPrecoCusto),
+          dataAtualizacaoPreco: dataHoraIso,
+          historicoPrecos: historico
+        };
+      }
+    } else {
+      listaFornecedores.push({
+        fornecedorId,
+        precoCusto: Number(novoPrecoCusto),
+        dataAtualizacaoPreco: dataHoraIso,
+        historicoPrecos: []
+      });
+    }
+
+    prod.fornecedores = listaFornecedores;
+    // Se o produto não tiver preco_custo padrão definido ou for zero, pode assumir como padrão o do fornecedor
+    if (!prod.preco_custo || prod.preco_custo === 0) {
+      prod.preco_custo = Number(novoPrecoCusto);
+    }
+
+    produtos[index] = prod;
+    this.saveProdutos(produtos);
+    return prod;
+  },
+
+  async desvincularFornecedorDoProduto(produtoId: string, fornecedorId: string): Promise<Produto> {
+    const produtos = this.getProdutos();
+    const index = produtos.findIndex(p => p.id === produtoId);
+    if (index === -1) throw new Error('Produto não encontrado');
+
+    const prod = { ...produtos[index] };
+    prod.fornecedores = (prod.fornecedores || []).filter(f => f.fornecedorId !== fornecedorId);
+    produtos[index] = prod;
+    this.saveProdutos(produtos);
+    return prod;
+  },
+
+  // -------------------------------------------------------------
+  // V3: PEDIDOS DE COMPRA
+  // -------------------------------------------------------------
+  getPedidosCompra(): PedidoCompra[] {
+    try {
+      const data = safeLocalStorage.getItem(STORAGE_KEY_PEDIDOS_COMPRA);
+      return data ? JSON.parse(data) : [];
+    } catch {
+      return [];
+    }
+  },
+
+  savePedidosCompra(pedidos: PedidoCompra[]): void {
+    safeLocalStorage.setItem(STORAGE_KEY_PEDIDOS_COMPRA, JSON.stringify(pedidos));
+    this.persistirEmTodasNuvens().catch(() => {});
+  },
+
+  async addPedidoCompra(pedidoData: Omit<PedidoCompra, 'id' | 'created_at'>): Promise<PedidoCompra> {
+    const novoPedido: PedidoCompra = {
+      ...pedidoData,
+      id: 'PED-' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substring(2, 4).toUpperCase(),
+      created_at: new Date().toISOString()
+    };
+
+    const pedidos = this.getPedidosCompra();
+    pedidos.unshift(novoPedido);
+    this.savePedidosCompra(pedidos);
+
+    // Persist to server
+    callServerApi('/api/pedidos-compra', {
+      method: 'POST',
+      body: JSON.stringify(novoPedido)
+    }).catch(() => {});
+
+    return novoPedido;
+  },
+
+  async updatePedidoCompra(id: string, pedidoData: Partial<PedidoCompra>): Promise<PedidoCompra> {
+    const pedidos = this.getPedidosCompra();
+    const index = pedidos.findIndex(p => p.id === id);
+    if (index === -1) throw new Error('Pedido não encontrado');
+
+    pedidos[index] = {
+      ...pedidos[index],
+      ...pedidoData,
+      updated_at: new Date().toISOString()
+    };
+    this.savePedidosCompra(pedidos);
+
+    callServerApi('/api/pedidos-compra', {
+      method: 'POST',
+      body: JSON.stringify(pedidos[index])
+    }).catch(() => {});
+
+    return pedidos[index];
+  },
+
+  async atualizarStatusPedidoCompra(
+    id: string, 
+    novoStatus: StatusPedidoCompra, 
+    recebidoPor?: string
+  ): Promise<PedidoCompra> {
+    const pedidos = this.getPedidosCompra();
+    const index = pedidos.findIndex(p => p.id === id);
+    if (index === -1) throw new Error('Pedido não encontrado');
+
+    const pedido = { ...pedidos[index] };
+    const statusAnterior = pedido.status;
+    pedido.status = novoStatus;
+    pedido.updated_at = new Date().toISOString();
+
+    // Ao mudar o status de um pedido para "recebido", o sistema deve automaticamente
+    // somar a quantidade de cada item ao estoque do produto correspondente na coleção de produtos.
+    if (novoStatus === 'recebido' && statusAnterior !== 'recebido') {
+      const nowIso = new Date().toISOString();
+      pedido.dataRecebimento = nowIso;
+      pedido.dataConfirmacaoRecebimento = nowIso;
+      if (recebidoPor) {
+        pedido.recebidoPor = recebidoPor;
+      }
+
+      if (Array.isArray(pedido.itens)) {
+        for (const item of pedido.itens) {
+          if (item.produtoId && item.quantidade > 0) {
+            try {
+              await this.ajustarEstoque(item.produtoId, item.quantidade);
+            } catch (err) {
+              console.warn(`Erro ao somar estoque ao receber pedido (${item.produtoId}):`, err);
+            }
+          }
+        }
+      }
+    }
+
+    pedidos[index] = pedido;
+    this.savePedidosCompra(pedidos);
+
+    // Sincroniza com servidor
+    callServerApi(`/api/pedidos-compra/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: novoStatus, recebidoPor })
+    }).catch(() => {});
+
+    return pedido;
+  },
+
+  async deletePedidoCompra(id: string): Promise<void> {
+    const pedidos = this.getPedidosCompra().filter(p => p.id !== id);
+    this.savePedidosCompra(pedidos);
+  },
+
+  // -------------------------------------------------------------
   // BACKUP MANUAL & RESTAURAÇÃO (JSON)
   // -------------------------------------------------------------
   exportBackup(): {
@@ -916,6 +1354,8 @@ export const storage = {
       totalVendas: number;
       totalCaixa: number;
       totalFiados: number;
+      totalFornecedores: number;
+      totalPedidosCompra: number;
       valorTotalEstoque: number;
       totalFaturadoVendas: number;
       saldoDevedorFiados: number;
@@ -926,6 +1366,8 @@ export const storage = {
     const vendas = this.getVendas();
     const caixa = this.getMovimentacoesCaixa();
     const fiados = this.getFiados();
+    const fornecedores = this.getFornecedores();
+    const pedidosCompra = this.getPedidosCompra();
     const resumosFiados = this.getResumoFiados();
 
     const valorTotalEstoque = Number(
@@ -945,7 +1387,7 @@ export const storage = {
 
     const data = {
       app: 'Lima Semijoias — Gestão & PDV',
-      versao: '2.2',
+      versao: '3.0',
       exportado_em: now.toISOString(),
       data_legivel: dataHoraLegivel,
       resumo: {
@@ -953,6 +1395,8 @@ export const storage = {
         total_vendas: vendas.length,
         total_movimentacoes_caixa: caixa.length,
         total_fiados: fiados.length,
+        total_fornecedores: fornecedores.length,
+        total_pedidos_compra: pedidosCompra.length,
         valor_total_estoque: valorTotalEstoque,
         total_faturado_vendas: totalFaturadoVendas,
         saldo_devedor_fiados: saldoDevedorFiados,
@@ -960,7 +1404,9 @@ export const storage = {
       produtos,
       vendas,
       caixa,
-      fiados
+      fiados,
+      fornecedores,
+      pedidosCompra
     };
 
     return {
@@ -971,6 +1417,8 @@ export const storage = {
         totalVendas: vendas.length,
         totalCaixa: caixa.length,
         totalFiados: fiados.length,
+        totalFornecedores: fornecedores.length,
+        totalPedidosCompra: pedidosCompra.length,
         valorTotalEstoque,
         totalFaturadoVendas,
         saldoDevedorFiados,
@@ -988,6 +1436,8 @@ export const storage = {
       vendas: number;
       caixa: number;
       fiados: number;
+      fornecedores: number;
+      pedidosCompra: number;
     };
     exportadoEm?: string;
   } {
@@ -1001,11 +1451,13 @@ export const storage = {
       const temVendas = Array.isArray(parsed.vendas);
       const temCaixa = Array.isArray(parsed.caixa);
       const temFiados = Array.isArray(parsed.fiados);
+      const temFornecedores = Array.isArray(parsed.fornecedores);
+      const temPedidosCompra = Array.isArray(parsed.pedidosCompra);
 
-      if (!temProdutos && !temVendas && !temCaixa && !temFiados) {
+      if (!temProdutos && !temVendas && !temCaixa && !temFiados && !temFornecedores && !temPedidosCompra) {
         return {
           valido: false,
-          erro: 'O arquivo não contém dados reconhecidos da Lima Semijoias (produtos, vendas, caixa ou fiados).'
+          erro: 'O arquivo não contém dados reconhecidos da Lima Semijoias.'
         };
       }
 
@@ -1017,6 +1469,8 @@ export const storage = {
           vendas: temVendas ? parsed.vendas.length : 0,
           caixa: temCaixa ? parsed.caixa.length : 0,
           fiados: temFiados ? parsed.fiados.length : 0,
+          fornecedores: temFornecedores ? parsed.fornecedores.length : 0,
+          pedidosCompra: temPedidosCompra ? parsed.pedidosCompra.length : 0,
         },
         exportadoEm: parsed.data_legivel || parsed.exportado_em || parsed.exportDate || 'Data não especificada'
       };
@@ -1033,6 +1487,8 @@ export const storage = {
       vendas: number;
       caixa: number;
       fiados: number;
+      fornecedores?: number;
+      pedidosCompra?: number;
     };
   }> {
     const validacao = this.validarArquivoBackup(jsonString);
@@ -1053,6 +1509,12 @@ export const storage = {
       }
       if (Array.isArray(parsed.fiados)) {
         this.saveFiados(parsed.fiados);
+      }
+      if (Array.isArray(parsed.fornecedores)) {
+        this.saveFornecedores(parsed.fornecedores);
+      }
+      if (Array.isArray(parsed.pedidosCompra)) {
+        this.savePedidosCompra(parsed.pedidosCompra);
       }
 
       // Salva imediatamente em ambas as nuvens persistentes (Firestore e Express)
