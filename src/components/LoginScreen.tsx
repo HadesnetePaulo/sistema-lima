@@ -43,7 +43,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onSuccess }) => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#1C1917] p-4 text-stone-100 relative overflow-hidden select-none">
+    <div className="min-h-screen min-h-dvh flex items-center justify-center bg-[#1C1917] p-4 text-stone-100 relative overflow-x-hidden overflow-y-auto select-none py-8">
       {/* Subtle luxury glow in background */}
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-amber-600/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-10 right-10 w-80 h-80 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />

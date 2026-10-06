@@ -1253,9 +1253,9 @@ export const NovaVenda: React.FC<NovaVendaProps> = ({
         </div>
       </div>
 
-      {/* MOBILE FLOATING CART BAR: Placed comfortably at bottom-20, clearing the fixed bottom navbar with generous air */}
+      {/* MOBILE FLOATING CART BAR: Placed safely at bottom-24 above fixed bottom navbar */}
       {carrinho.length > 0 && (
-        <div className="lg:hidden fixed bottom-20 left-3 right-3 sm:left-6 sm:right-6 z-30 pointer-events-none animate-in slide-in-from-bottom duration-200">
+        <div className="lg:hidden fixed bottom-24 left-3 right-3 sm:left-6 sm:right-6 z-30 pointer-events-none animate-in slide-in-from-bottom duration-200">
           <div className="max-w-md mx-auto pointer-events-auto">
             <button
               onClick={() => setCarrinhoMobileAberto(true)}
@@ -1291,7 +1291,7 @@ export const NovaVenda: React.FC<NovaVendaProps> = ({
           onClick={() => setCarrinhoMobileAberto(false)}
         >
           <div
-            className="w-full h-[92vh] max-h-[92vh] bg-white rounded-t-3xl shadow-2xl flex flex-col animate-in slide-in-from-bottom duration-250 overflow-hidden"
+            className="w-full h-[90dvh] max-h-[90dvh] bg-white rounded-t-3xl shadow-2xl flex flex-col animate-in slide-in-from-bottom duration-250 overflow-hidden"
             onClick={e => e.stopPropagation()}
           >
             {/* Grab Handle */}
@@ -1817,7 +1817,7 @@ export const NovaVenda: React.FC<NovaVendaProps> = ({
             </div>
 
             {/* FIXED BOTTOM ACTION BAR: Always visible, never cut off! */}
-            <div className="p-3.5 bg-white border-t border-stone-200/90 shadow-2xl flex items-center justify-between gap-3 shrink-0 z-10 pb-safe">
+            <div className="p-3.5 pb-safe pb-5 bg-white border-t border-stone-200/90 shadow-2xl flex items-center justify-between gap-3 shrink-0 z-10">
               <div>
                 <span className="text-[10px] text-stone-400 font-bold uppercase tracking-wider block">
                   Total da Venda

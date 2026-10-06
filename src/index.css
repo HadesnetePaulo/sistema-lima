@@ -6,9 +6,19 @@
     --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   }
 
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    overflow-x: hidden;
+    height: 100%;
+  }
+
   body {
     font-family: var(--font-sans);
     -webkit-tap-highlight-color: transparent;
+    overflow-x: hidden;
+    min-height: 100%;
+    min-height: 100dvh;
   }
 
   h1, h2, h3, .font-display {
@@ -16,9 +26,13 @@
   }
 }
 
-/* Safe area padding for mobile devices with home indicator */
+/* Safe area padding for mobile devices with notch and home indicator */
 .pb-safe {
-  padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0.75rem));
+  padding-bottom: max(1rem, env(safe-area-inset-bottom, 1rem));
+}
+
+.pt-safe {
+  padding-top: max(0.5rem, env(safe-area-inset-top, 0.5rem));
 }
 
 .no-scrollbar::-webkit-scrollbar {

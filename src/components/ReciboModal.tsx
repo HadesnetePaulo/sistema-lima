@@ -104,7 +104,7 @@ export const ReciboModal: React.FC<ReciboModalProps> = ({ venda, onClose, onCanc
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-3 sm:p-4 overflow-y-auto">
-      <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-stone-200 overflow-hidden my-4 flex flex-col max-h-[92vh]">
+      <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-stone-200 overflow-hidden my-auto flex flex-col max-h-[90dvh] max-h-[90vh]">
         {/* Modal Top Actions Bar */}
         <div className="flex items-center justify-between px-5 py-3.5 bg-stone-900 text-stone-100 no-print shrink-0">
           <div className="flex items-center gap-2">

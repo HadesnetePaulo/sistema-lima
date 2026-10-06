@@ -191,7 +191,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#FAF8F5] text-stone-800">
+    <div className="min-h-screen min-h-dvh flex flex-col bg-[#FAF8F5] text-stone-800 w-full overflow-x-hidden">
       {/* Offline Status Toast */}
       {!isOnline && (
         <div className="bg-amber-600 text-white text-xs px-4 py-1.5 flex items-center justify-center gap-2 text-center no-print">
@@ -209,8 +209,8 @@ export default function App() {
         supabaseConnected={supabaseConnected}
       />
 
-      {/* Main Content Area - Generous bottom padding so elements never clash with fixed mobile navbar */}
-      <main className="flex-1 pb-28 sm:pb-12">
+      {/* Main Content Area - Generous bottom padding (pb-36) so elements never clash with fixed mobile navbar */}
+      <main className="flex-1 pb-36 sm:pb-12 w-full max-w-full overflow-x-hidden">
         {activeTab === 'pdv' && (
           <NovaVenda
             produtos={produtos}

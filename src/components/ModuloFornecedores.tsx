@@ -1894,8 +1894,8 @@ export const ModuloFornecedores: React.FC<ModuloFornecedoresProps> = ({
       {/* MODAL: CONFIRMAÇÃO DE RECEBIMENTO NO ESTOQUE */}
       {/* ========================================================= */}
       {pedidoRecebendo && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-stone-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
+          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-stone-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150 my-auto max-h-[90dvh] flex flex-col">
             <div className="bg-emerald-800 text-white px-6 py-4 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="w-5 h-5 text-emerald-300" />

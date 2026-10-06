@@ -379,8 +379,14 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Mobile "Mais" Bottom Sheet Drawer */}
       {mobileMenuAberto && (
-        <div className="lg:hidden fixed inset-0 z-50 flex flex-col justify-end bg-black/60 backdrop-blur-xs">
-          <div className="w-full bg-stone-900 rounded-t-3xl border-t border-stone-800 p-5 shadow-2xl space-y-3 animate-in slide-in-from-bottom duration-200">
+        <div 
+          className="lg:hidden fixed inset-0 z-50 flex flex-col justify-end bg-black/60 backdrop-blur-xs"
+          onClick={() => setMobileMenuAberto(false)}
+        >
+          <div 
+            className="w-full bg-stone-900 rounded-t-3xl border-t border-stone-800 p-5 pb-safe pb-8 shadow-2xl space-y-3 animate-in slide-in-from-bottom duration-200"
+            onClick={e => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between pb-2 border-b border-stone-800">
               <span className="text-xs uppercase tracking-wider font-semibold text-stone-400">
                 Menu Adicional
